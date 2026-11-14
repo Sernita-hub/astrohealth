@@ -37,7 +37,7 @@ Logs are stored only in the browser (`localStorage`). Reports you transmit to Ea
 | Collect health indicators through different inputs (keyboard, clicks, camera…) | Keyboard (numeric values), clicks (mood and stress pickers, symptom checklist) and **tap-to-measure pulse**: the astronaut taps the screen on every heartbeat and AstroHealth calculates the heart rate |
 | Guidance on treatments and health improvements | Every out-of-range value shows **specific actions**, depending on whether it is high or low and whether it needs watching or is critical |
 | When does a result need attention from the crew or flight surgeons? | Three levels, **Normal / Watch / Critical**, with clear escalation criteria and a **Report to Earth** button that stores the report in a real database, listed in the **Mission Control** view |
-| A human figure with clickable body parts | **Body map** with 10 regions (brain, eyes, lungs, heart, blood and immunity, digestion, kidneys, bones, muscles, skin and radiation): what each does, how space affects it, current data and what to do |
+| A human figure with clickable body parts | **3D holographic body map** that you can rotate. It has 10 regions (brain, eyes, lungs, heart, blood and immunity, digestion, kidneys, bones, muscles, skin and radiation), and each organ glows in the color of its health status. Choosing a region zooms the camera in on it and shows what it does, how space affects it, the current data and what to do |
 | Different environments (spacecraft, station, rover, base) | 5 environments with their own gravity, typical radiation, exercise goal and real **communication delay** (from real time on the ISS to ~12 min from Mars) |
 | Prompt measurements as part of the mission routine | **Daily routine** with scheduled times and **reminders** when a task is overdue |
 | Gamification | XP, levels and ranks, streaks, "perfect days" and 11 badges |
@@ -92,7 +92,8 @@ To use your own Supabase project: run `supabase/schema.sql` in its SQL editor, t
 ## Technology
 
 - Plain HTML, CSS and JavaScript with **no libraries or build step**: it works offline.
-- Custom `<canvas>` charts, SVG human figure and icons.
+- Custom `<canvas>` charts and SVG icons.
+- A **3D hologram of the human body** drawn by a small software 3D engine on `<canvas>`, with no WebGL library. It uses perspective projection, an orbit camera that flies to each organ, depth-faded glowing wireframes, a heartbeat and blood flow. It respects the "reduce motion" setting.
 - Local persistence with `localStorage`.
 - **Supabase** (Postgres, anonymous Auth and Row Level Security) for the reports to Earth, used through its REST API with plain `fetch`, with no SDK.
 - Hosted as a static site on **Render** and **GitHub Pages**. Both deploy automatically from the `main` branch.
@@ -106,6 +107,7 @@ js/logic.js         Assessment, alerts, trends, gamification, demo data and repo
 js/i18n.js          Spanish content pack and the EN/ES language switch
 js/charts.js        Line charts and sparklines
 js/icons.js         SVG icons and logo
+js/holo.js          3D hologram body: procedural figure, organs, camera and zoom
 js/cloud.js         Link to Mission Control: Supabase connection, anonymous session and report storage
 js/app.js           User interface and views
 supabase/schema.sql Database table, security rules and limits
@@ -143,7 +145,7 @@ AstroHealth was built with one SI tool: **Claude (Anthropic)**, an AI assistant 
 
 | Part of the project | What the SI tool did |
 |---|---|
-| Code | Wrote the HTML, CSS and JavaScript in this repository, including the canvas charts, the SVG icons, the logo, the SVG body map, the Supabase connection and the database schema (`supabase/schema.sql`). |
+| Code | Wrote the HTML, CSS and JavaScript in this repository, including the canvas charts, the SVG icons, the logo, the 3D hologram body and its rendering engine, the Supabase connection and the database schema (`supabase/schema.sql`). |
 | Cloud setup | Created the Supabase project and the Render and GitHub Pages deployments at the team's request. |
 | Data | Wrote the reference ranges and recommendations in `js/data.js` as educational approximations, and the 30-day **simulated** demo mission. No real astronaut data is used. |
 | Text | Wrote the interface text, the health guidance, the Spanish translation and this README. |

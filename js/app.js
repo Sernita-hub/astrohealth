@@ -74,6 +74,7 @@
   function renderView() {
     stopBreath(false);
     if (chart && view !== 'trends') { chart.destroy(); chart = null; }
+    if (holo && view !== 'body') holo.pause();
     ({ dashboard: renderDashboard, body: renderBody, log: renderLog, trends: renderTrends, routine: renderRoutine, control: renderControl, guide: renderGuide })[view]();
   }
 
@@ -304,41 +305,29 @@
   }
 
   /* ============================================================== Body map */
-  // Outline of the right half of the figure (mirrored for the left half)
-  const BODY_R = [
-    [162, 100], [164, 118], [205, 130], [222, 148], [228, 190], [232, 240], [238, 290], [244, 330],
-    [251, 350], [249, 372], [239, 378], [232, 362], [228, 336], [220, 290], [212, 246], [206, 205],
-    [203, 178], [199, 212], [194, 252], [200, 292], [204, 332], [200, 400], [194, 452], [193, 505],
-    [189, 560], [202, 578], [200, 590], [168, 590], [166, 568], [168, 505], [166, 452], [161, 385], [150, 350]
-  ];
-  let bodyPathCache = null;
+  // 3D hologram of the body (js/holo.js). It is created once and re-attached on each render,
+  // so the camera keeps its position and zoom when the view refreshes.
+  let holo = null;
 
-  function smoothPath(pts) {
-    const n = pts.length;
-    let d = `M${pts[0][0]},${pts[0][1]}`;
-    for (let i = 0; i < n; i++) {
-      const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
-      const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
-      const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
-      d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0]},${p2[1]}`;
-    }
-    return d + 'Z';
-  }
-
-  function bodyPath() {
-    if (!bodyPathCache) {
-      const left = BODY_R.slice(0, -1).reverse().map(([x, y]) => [300 - x, y]);
-      bodyPathCache = smoothPath(BODY_R.concat(left));
-    }
-    return bodyPathCache;
-  }
-
-  function hotspot(r) {
-    const lv = A.regions[r.id].level;
-    return `<g class="hotspot lvl-${lv} ${r.id === region ? 'selected' : ''}" data-region="${r.id}" transform="translate(${r.x} ${r.y})" tabindex="0" role="button" aria-label="${esc(r.name)}: ${V.LEVEL_TEXT[lv]}">
-      <title>${esc(r.name)} · ${V.LEVEL_TEXT[lv]}</title>
-      <circle class="hs-hit" r="18"/><circle class="hs-pulse" r="15"/><circle class="hs-ring" r="12"/><circle class="hs-dot" r="7"/>
-    </g>`;
+  function mountHolo() {
+    const stage = $('#holo-stage');
+    if (!stage || !V.createHolo) return;
+    if (!holo) holo = V.createHolo();
+    holo.mount(stage, {
+      selected: region,
+      regions: Object.values(V.REGIONS).map((r) => {
+        const lv = A.regions[r.id].level;
+        return { id: r.id, name: r.name, level: lv, levelText: V.LEVEL_TEXT[lv] };
+      }),
+      texts: {
+        title: tx('Bio-scan · 3D', 'Bioescaneo · 3D'),
+        canvas: tx('3D hologram of the human body. Choose a region to zoom in on it.', 'Holograma 3D del cuerpo humano. Elige una región para acercarte a ella.'),
+        hint: tx('Drag to rotate · choose a point to zoom in', 'Arrastra para girar · elige un punto para acercar'),
+        reset: tx('Full body', 'Cuerpo completo'),
+        left: tx('Rotate left', 'Girar a la izquierda'),
+        right: tx('Rotate right', 'Girar a la derecha')
+      }
+    });
   }
 
   function regionPanel(id) {
@@ -384,19 +373,7 @@
       <div class="page-head"><div><h1>${tx('Body map', 'Mapa del cuerpo')}</h1><p class="muted">${tx('Tap a point to see what that region does, how space affects it and how you are doing.', 'Toca un punto para ver la función de esa región, cómo la afecta el espacio y tu estado actual.')}</p></div></div>
       <div class="body-layout">
         <div class="card body-card">
-          <svg class="body-svg" viewBox="0 0 300 600" role="group" aria-label="${tx('Human figure with interactive regions', 'Figura humana con regiones interactivas')}">
-            <defs>
-              <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" style="stop-color:var(--body-a)"/><stop offset="1" style="stop-color:var(--body-b)"/>
-              </linearGradient>
-            </defs>
-            <g class="figure">
-              <path d="${bodyPath()}" fill="url(#bodyGrad)" class="silhouette"/>
-              <ellipse cx="150" cy="58" rx="32" ry="40" fill="url(#bodyGrad)" class="silhouette"/>
-              <path d="M150 112 V 334" class="spine"/>
-            </g>
-            ${regs.map(hotspot).join('')}
-          </svg>
+          <div class="holo-stage" id="holo-stage" role="group" aria-label="${tx('Human figure with interactive regions', 'Figura humana con regiones interactivas')}"></div>
           <ul class="legend"><li class="lvl-ok">${V.LEVEL_TEXT.ok}</li><li class="lvl-watch">${V.LEVEL_TEXT.watch}</li><li class="lvl-crit">${V.LEVEL_TEXT.crit}</li><li class="lvl-none">${V.LEVEL_TEXT.none}</li></ul>
         </div>
         <div class="card region-panel" id="region-panel" aria-live="polite">${regionPanel(region)}</div>
@@ -405,19 +382,22 @@
         <button type="button" class="region-chip lvl-${A.regions[r.id].level} ${r.id === region ? 'selected' : ''}" data-region="${r.id}" aria-pressed="${r.id === region}">
           <span class="dot"></span>${esc(r.name)}${state.events.visited.includes(r.id) ? '' : `<span class="new" title="${tx('Not explored yet', 'Sin explorar')}">${tx('new', 'nuevo')}</span>`}
         </button>`).join('')}</div>`;
+    mountHolo();
   }
 
   function selectRegion(el, keyboard) {
     const id = el.dataset.region;
     if (!V.REGIONS[id]) return;
-    const kind = el.classList.contains('hotspot') ? '.hotspot' : '.region-chip';
+    const kind = el.classList.contains('holo-hs') ? '.holo-hs' : '.region-chip';
     region = id;
     if (!state.events.visited.includes(id)) { state.events.visited.push(id); commit(); }
     else renderBody();
-    if (keyboard) { const f = $(`${kind}[data-region="${id}"]`); if (f) f.focus(); }
+    if (holo) holo.focus(id); // zoom in on the chosen region
+    if (keyboard) { const f = $(`${kind}[data-region="${id}"]`); if (f) f.focus({ preventScroll: true }); }
     if (window.matchMedia('(max-width: 900px)').matches) {
-      const p = $('#region-panel');
-      if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // On phones, bring the hologram into view so the zoom can be seen; the panel follows below it
+      const card = $('.body-card');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
@@ -1644,8 +1624,6 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !$('#modal-root').hidden) { closeModal(); return; }
-    const hs = e.target.closest && e.target.closest('.hotspot');
-    if (hs && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectRegion(hs, true); }
   });
 
   document.addEventListener('input', (e) => {
