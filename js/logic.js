@@ -81,7 +81,8 @@
     version: 1,
     profile: null,
     records: [],
-    events: { breath: [], reports: [], visited: [] }
+    events: { breath: [], reports: [], visited: [] },
+    outbox: [] // reports to Earth waiting for a signal (see js/cloud.js)
   });
 
   V.normalizeState = (s) => {
@@ -90,6 +91,7 @@
     const out = Object.assign(base, s);
     out.events = Object.assign(V.defaultState().events, s.events || {});
     ['breath', 'reports', 'visited'].forEach((k) => { if (!Array.isArray(out.events[k])) out.events[k] = []; });
+    out.outbox = Array.isArray(s.outbox) ? s.outbox.filter((o) => o && o.row && o.row.client_id && o.row.report) : [];
     out.records = Array.isArray(s.records)
       ? s.records.filter((r) => r && r.ts && !isNaN(new Date(r.ts))).map((r) => ({
           id: r.id || V.newId(),

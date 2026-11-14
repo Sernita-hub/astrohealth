@@ -6,7 +6,7 @@
 
 AstroHealth is a visual health self-assessment tool for astronauts on long-duration missions. Crew members log their health indicators, instantly see what each value means in the space environment, and know what to do next: act on their own, alert the Crew Medical Officer, or send a report to the flight surgeon on Earth.
 
-It is built to work offline, as it would aboard a spacecraft: no installation, no server and no internet connection required. The interface is available in **English and Spanish**: use the **EN / ES** switch in the top bar (English is the default, and each browser remembers its choice).
+It is built to work offline, as it would aboard a spacecraft: no installation and no account needed. When there is a connection, every report to Earth is stored in a cloud database (**Supabase**) that plays the role of Mission Control. Without one, reports wait in an outbox and leave automatically when the link comes back (store-and-forward). The interface is available in **English and Spanish**: use the **EN / ES** switch in the top bar (English is the default, and each browser remembers its choice).
 
 ---
 
@@ -23,7 +23,7 @@ python -m http.server 5173
 
 then open `http://localhost:5173`.
 
-Data is stored only in the browser (`localStorage`). From **Settings** you can export it as JSON (copy), import it from a `.json` file, reload the demo or delete everything.
+Logs are stored only in the browser (`localStorage`). Reports you transmit to Earth are also stored in Supabase under an anonymous ID for that browser: no sign-up is needed. From **Settings** you can export your data as JSON (copy), import it from a `.json` file, reload the demo or delete everything, including the reports stored in the cloud.
 
 ---
 
@@ -34,7 +34,7 @@ Data is stored only in the browser (`localStorage`). From **Settings** you can e
 | A visual tool for astronauts to assess their own health | **Dashboard** with an AstroHealth score (0–100) and 12 color-coded indicator cards with 7-day sparklines |
 | Collect health indicators through different inputs (keyboard, clicks, camera…) | Keyboard (numeric values), clicks (mood and stress pickers, symptom checklist) and **tap-to-measure pulse**: the astronaut taps the screen on every heartbeat and AstroHealth calculates the heart rate |
 | Guidance on treatments and health improvements | Every out-of-range value shows **specific actions**, depending on whether it is high or low and whether it needs watching or is critical |
-| When does a result need attention from the crew or flight surgeons? | Three levels, **Normal / Watch / Critical**, with clear escalation criteria and a **Report to Earth** button |
+| When does a result need attention from the crew or flight surgeons? | Three levels, **Normal / Watch / Critical**, with clear escalation criteria and a **Report to Earth** button that stores the report in a real database, listed in the **Mission Control** view |
 | A human figure with clickable body parts | **Body map** with 10 regions (brain, eyes, lungs, heart, blood and immunity, digestion, kidneys, bones, muscles, skin and radiation): what each does, how space affects it, current data and what to do |
 | Different environments (spacecraft, station, rover, base) | 5 environments with their own gravity, typical radiation, exercise goal and real **communication delay** (from real time on the ISS to ~12 min from Mars) |
 | Prompt measurements as part of the mission routine | **Daily routine** with scheduled times and **reminders** when a task is overdue |
@@ -55,7 +55,20 @@ It detects **multi-day trends** as well: accumulated sleep debt, persistently lo
 
 ### Report to Earth
 
-AstroHealth generates a text report for the flight surgeon (indicators, symptoms, alerts, exposure and notes) that can be copied. The **simulated transmission** shows the real round-trip delay for the current environment and a simulated reply from the flight surgeon. It illustrates why, far from Earth, crews need to be able to assess themselves and act on their own.
+AstroHealth generates a text report for the flight surgeon (indicators, symptoms, alerts, exposure and notes) that can be copied or transmitted. **Transmitting** stores it in the Supabase database, and the animation shows the real one-way and round-trip delay for the current environment, followed by a simulated reply from the flight surgeon. It illustrates why, far from Earth, crews need to be able to assess themselves and act on their own.
+
+The **Mission Control** view lists the reports received on Earth (date, astronaut, environment, mission day, score and status, with the full text), the reports still waiting in the outbox, and the state of the link.
+
+### Cloud architecture and privacy
+
+- **No registration.** Each browser signs in anonymously through Supabase Auth, so anyone (judges included) can try the full flow without creating an account.
+- **Row Level Security.** Database rules let each anonymous device read, add and delete only its own reports. Without a session, the table cannot be read at all. See [`supabase/schema.sql`](supabase/schema.sql).
+- **Store-and-forward.** Reports are queued on board and sent when the connection returns. This is how deep-space communication works too.
+- **Limits.** Field lengths and values are checked by the database, and each device can store up to 200 reports.
+- **The key in `js/cloud.js` is public by design.** It is Supabase's *publishable* key: it only allows what the database rules above permit.
+- **Demo data only.** AstroHealth is a prototype, not a medical system. Use fictional or demo data.
+
+To use your own Supabase project: run `supabase/schema.sql` in its SQL editor, turn on **Authentication → Sign In / Providers → Allow anonymous sign-ins**, and put the project URL and publishable key in `js/cloud.js`. With an empty URL or key, the app runs fully offline and the link is simulated.
 
 ---
 
@@ -76,20 +89,24 @@ AstroHealth generates a text report for the flight surgeon (indicators, symptoms
 
 ## Technology
 
-- Plain HTML, CSS and JavaScript with **no libraries or external dependencies**: it works offline.
+- Plain HTML, CSS and JavaScript with **no libraries or build step**: it works offline.
 - Custom `<canvas>` charts, SVG human figure and icons.
 - Local persistence with `localStorage`.
+- **Supabase** (Postgres, anonymous Auth and Row Level Security) for the reports to Earth, used through its REST API with plain `fetch`, with no SDK.
+- Hosted as a static site on **Render** and **GitHub Pages**. Both deploy automatically from the `main` branch.
 - Responsive layout for desktop, tablet and phone. Keyboard accessible.
 
 ```
-index.html        App structure
-css/styles.css    Styles (dark mission-control theme)
-js/data.js        Indicators, ranges, environments, hazards, body regions, routine and badges (English content)
-js/logic.js       Assessment, alerts, trends, gamification, demo data and report
-js/i18n.js        Spanish content pack and the EN/ES language switch
-js/charts.js      Line charts and sparklines
-js/icons.js       SVG icons and logo
-js/app.js         User interface and views
+index.html          App structure
+css/styles.css      Styles (dark mission-control theme)
+js/data.js          Indicators, ranges, environments, hazards, body regions, routine and badges (English content)
+js/logic.js         Assessment, alerts, trends, gamification, demo data and report
+js/i18n.js          Spanish content pack and the EN/ES language switch
+js/charts.js        Line charts and sparklines
+js/icons.js         SVG icons and logo
+js/cloud.js         Link to Mission Control: Supabase connection, anonymous session and report storage
+js/app.js           User interface and views
+supabase/schema.sql Database table, security rules and limits
 ```
 
 To adjust a range or a recommendation, or to add an indicator, edit `js/data.js` (and its Spanish text in `js/i18n.js`). Interface strings are written in `js/app.js` as `tx('English', 'Español')` pairs.
@@ -99,6 +116,8 @@ To adjust a range or a recommendation, or to add an indicator, edit `js/data.js`
 ## Limitations and next steps
 
 - Ranges and models are **approximate**. AstroHealth is not a medical device.
+- The flight surgeon's reply is still simulated. A real flight-surgeon console that reads the reports would need staff accounts and stricter access rules.
+- Anonymous sign-ins are rate-limited by Supabase but have no CAPTCHA. A public deployment should add one.
 - Pulse measurement with the **camera** (fingertip photoplethysmography).
 - Integration with real sensors (oximeter, blood pressure cuff, actigraph) over Bluetooth.
 - A Crew Medical Officer view showing the status of the whole crew.
@@ -122,7 +141,8 @@ AstroHealth was built with one SI tool: **Claude (Anthropic)**, an AI assistant 
 
 | Part of the project | What the SI tool did |
 |---|---|
-| Code | Wrote the HTML, CSS and JavaScript in this repository, including the canvas charts, the SVG icons, the logo and the SVG body map. |
+| Code | Wrote the HTML, CSS and JavaScript in this repository, including the canvas charts, the SVG icons, the logo, the SVG body map, the Supabase connection and the database schema (`supabase/schema.sql`). |
+| Cloud setup | Created the Supabase project and the Render and GitHub Pages deployments at the team's request. |
 | Data | Wrote the reference ranges and recommendations in `js/data.js` as educational approximations, and the 30-day **simulated** demo mission. No real astronaut data is used. |
 | Text | Wrote the interface text, the health guidance, the Spanish translation and this README. |
 | Design | Proposed the feature set and the screen layout, following the requirements listed in the challenge description. |

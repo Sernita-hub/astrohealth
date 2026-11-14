@@ -24,7 +24,7 @@
   const moodLabel = (v) => tx(['', 'Very bad', 'Bad', 'Okay', 'Good', 'Excellent'], ['', 'Muy mal', 'Mal', 'Regular', 'Bien', 'Excelente'])[v];
   const stressLabel = (v) => tx(['', 'Very low', 'Low', 'Moderate', 'High', 'Extreme'], ['', 'Muy bajo', 'Bajo', 'Moderado', 'Alto', 'Extremo'])[v];
   const bpName = () => tx('Blood pressure', 'Presión arterial');
-  const VIEWS = ['dashboard', 'body', 'log', 'trends', 'routine', 'guide'];
+  const VIEWS = ['dashboard', 'body', 'log', 'trends', 'routine', 'control', 'guide'];
   const BP_RANGE = '90–129 / 60–84 mmHg';
 
   let state = V.loadState();
@@ -74,7 +74,7 @@
   function renderView() {
     stopBreath(false);
     if (chart && view !== 'trends') { chart.destroy(); chart = null; }
-    ({ dashboard: renderDashboard, body: renderBody, log: renderLog, trends: renderTrends, routine: renderRoutine, guide: renderGuide })[view]();
+    ({ dashboard: renderDashboard, body: renderBody, log: renderLog, trends: renderTrends, routine: renderRoutine, control: renderControl, guide: renderGuide })[view]();
   }
 
   function setView(v, opts = {}) {
@@ -1066,9 +1066,11 @@
           <p>${tx(
             'AstroHealth is an educational prototype built for the NASA Space Apps Challenge 2026. Its ranges and models are approximate and simplified (for example, the estimated bone loss). It is not a medical device and does not replace evaluation by a flight surgeon or a health professional.',
             'AstroHealth es un prototipo educativo creado para el NASA Space Apps Challenge 2026. Los rangos y modelos son orientativos y simplificados (por ejemplo, la pérdida ósea estimada). No es un dispositivo médico ni sustituye la evaluación del cirujano de vuelo o de un profesional de la salud.')}</p>
-          <p class="small muted">${tx(
-            'Your data is stored only in this browser and is never sent to any server. The "transmission to Earth" is a simulation.',
-            'Tus datos se guardan solo en este navegador y nunca se envían a ningún servidor. La «transmisión a Tierra» es una simulación.')}</p>
+          <p class="small muted">${cloudOn()
+            ? tx('Your logs are stored only in this browser. Only the reports you transmit to Earth are sent to the Mission Control database (Supabase), linked to an anonymous ID for this browser. Use fictional or demo data only.',
+              'Tus registros se guardan solo en este navegador. Solo los reportes que transmites a Tierra se envían a la base de datos del control de misión (Supabase), vinculados a un ID anónimo de este navegador. Usa solo datos ficticios o de demostración.')
+            : tx('Your data is stored only in this browser and is never sent to any server. The "transmission to Earth" is a simulation.',
+              'Tus datos se guardan solo en este navegador y nunca se envían a ningún servidor. La «transmisión a Tierra» es una simulación.')}</p>
         </div>
       </div>`;
   }
@@ -1172,7 +1174,9 @@
       ${welcome ? '' : `
       <hr>
       <h3>${tx('Data', 'Datos')}</h3>
-      <p class="small muted">${tx(`Your data is stored only in this browser (${state.records.length} logs).`, `Tus datos se guardan solo en este navegador (${state.records.length} registros).`)}</p>
+      <p class="small muted">${tx(`Your logs are stored only in this browser (${state.records.length} logs).`, `Tus registros se guardan solo en este navegador (${state.records.length} registros).`)}${cloudOn()
+        ? ' ' + tx('Reports you transmit to Earth are stored in the Mission Control database under an anonymous ID.', 'Los reportes que transmites a Tierra se guardan en la base de datos del control de misión con un ID anónimo.')
+        : ''}</p>
       <div class="btn-row">
         <button type="button" class="btn" data-action="demo">${ic('rocket')} ${tx('Load demo mission', 'Cargar misión de demostración')}</button>
         <button type="button" class="btn" data-action="export">${ic('download')} ${tx('Export JSON', 'Exportar JSON')}</button>
@@ -1231,11 +1235,21 @@
   }
 
   function wipe() {
+    const linked = cloudOn() && !!V.cloud.deviceId();
     confirmDialog({
       title: tx('Delete all data', 'Borrar todos los datos'),
-      text: tx('All your logs and settings stored in this browser will be deleted. This cannot be undone.', 'Se borrarán todos tus registros y ajustes guardados en este navegador. No se puede deshacer.'),
+      text: linked
+        ? tx('All your logs and settings stored in this browser will be deleted, together with the reports this browser sent to the Mission Control database. This cannot be undone.', 'Se borrarán todos tus registros y ajustes guardados en este navegador, junto con los reportes que este navegador envió a la base de datos del control de misión. No se puede deshacer.')
+        : tx('All your logs and settings stored in this browser will be deleted. This cannot be undone.', 'Se borrarán todos tus registros y ajustes guardados en este navegador. No se puede deshacer.'),
       yes: tx('Delete everything', 'Borrar todo')
     }, () => {
+      if (linked) {
+        V.cloud.removeAll()
+          .then(() => toast(tx('Reports deleted from the Mission Control database', 'Reportes borrados de la base de datos del control de misión'), 'info', 'trash'))
+          .catch(() => toast(tx("Couldn't reach Mission Control: the reports stored there were not deleted. Try again when you have a connection.", 'No se pudo contactar con el control de misión: los reportes guardados allí no se borraron. Vuelve a intentarlo cuando tengas conexión.'), 'error', 'alert'));
+      }
+      cloudRows = null;
+      cloudErr = null;
       state = V.defaultState();
       V.saveState(state);
       refresh();
@@ -1316,7 +1330,11 @@
       <div class="btn-row end">
         <button type="button" class="btn" data-action="copy-report">${ic('copy')} ${tx('Copy report', 'Copiar reporte')}</button>
         <button type="button" class="btn btn-primary" data-action="transmit" id="tx-btn">${ic('send')} ${tx('Transmit to Earth', 'Transmitir a Tierra')}</button>
-      </div>`, { cls: 'wide', label: tx('Report to Earth', 'Reporte a Tierra') });
+      </div>
+      <p class="mc-note small muted">${ic(cloudOn() ? 'lock' : 'info')}<span>${cloudOn()
+        ? tx('Transmitted reports are stored in the Mission Control database (Supabase) under an anonymous ID for this browser. Use fictional or demo data only.', 'Los reportes transmitidos se guardan en la base de datos del control de misión (Supabase) con un ID anónimo de este navegador. Usa solo datos ficticios o de demostración.')
+        : tx('Simulated link: this copy of AstroHealth is not connected to a database.', 'Enlace simulado: esta copia de AstroHealth no está conectada a una base de datos.')}
+        <button type="button" class="link" data-view-link="control">${tx('Open Mission Control', 'Abrir el control de misión')}</button></span></p>`, { cls: 'wide', label: tx('Report to Earth', 'Reporte a Tierra') });
   }
 
   function transmit() {
@@ -1324,6 +1342,14 @@
     if (!btn || btn.disabled) return;
     btn.disabled = true;
     const env = A.ctx.env;
+    // With the cloud link on, the report goes to the outbox and is sent to Supabase right away
+    const linked = cloudOn();
+    const row = linked ? buildCloudRow() : null;
+    if (linked) {
+      state.outbox.push({ row, queuedAt: row.onboard_at });
+      V.saveState(state);
+    }
+    const sendP = linked ? flushOutbox() : Promise.resolve(null);
     const dur = env.delaySec ? Math.min(6, Math.max(2, env.delaySec / 120)) : 1.2;
     const dot = $('#tx-dot'), status = $('#tx-status'), reply = $('#tx-reply');
     reply.hidden = true;
@@ -1337,10 +1363,25 @@
     };
     fly('0%', '100%');
     status.innerHTML = `${tx('Transmitting… real transit time', 'Transmitiendo… tránsito real')}: <strong>${V.fmtDelay(env.delaySec)}</strong>${env.delaySec >= 60 ? tx(' (sped-up simulation)', ' (simulación acelerada)') : ''}.`;
-    txTimers.push(setTimeout(() => {
+    txTimers.push(setTimeout(() => sendP.then((res) => {
+      if (!document.contains(status)) return; // the dialog was closed meanwhile
       state.events.reports.push(new Date().toISOString());
       commit();
-      status.innerHTML = `${ic('check')} ${tx("Received by Mission Control. Waiting for the flight surgeon's reply…", 'Recibido en el control de misión. Esperando respuesta del cirujano de vuelo…')}`;
+      const pending = linked ? state.outbox.find((o) => o.row.client_id === row.client_id) : null;
+      if (pending) {
+        // No signal (or the database refused it): the report waits in the outbox
+        dot.classList.remove('on', 'back');
+        const err = res && res.error;
+        status.innerHTML = err && err.kind === 'rejected'
+          ? `${ic('alert')} ${esc(cloudErrorText(err))}`
+          : `${ic('clock')} ${tx('No signal right now. The report is saved in the outbox and will be sent automatically when the link is back.', 'Ahora no hay señal. El reporte queda guardado en la bandeja de salida y se enviará solo cuando vuelva el enlace.')}`;
+        btn.disabled = false;
+        btn.innerHTML = `${ic('send')} ${tx('Transmit again', 'Transmitir de nuevo')}`;
+        return;
+      }
+      status.innerHTML = linked
+        ? `${ic('check')} ${tx("Stored in the Mission Control database. Waiting for the flight surgeon's reply…", 'Guardado en la base de datos del control de misión. Esperando respuesta del cirujano de vuelo…')}`
+        : `${ic('check')} ${tx("Received by Mission Control. Waiting for the flight surgeon's reply…", 'Recibido en el control de misión. Esperando respuesta del cirujano de vuelo…')}`;
       dot.classList.add('back');
       fly('100%', '0%');
       txTimers.push(setTimeout(() => {
@@ -1361,7 +1402,162 @@
         btn.disabled = false;
         btn.innerHTML = `${ic('send')} ${tx('Transmit again', 'Transmitir de nuevo')}`;
       }, dur * 1000));
-    }, dur * 1000));
+    }), dur * 1000));
+  }
+
+  /* ------------------------------------------ Mission Control (cloud link) */
+  const cloudOn = () => !!(V.cloud && V.cloud.enabled());
+  let cloudRows = null;   // reports received by Mission Control (latest list from the cloud)
+  let cloudErr = null;
+  let cloudBusy = false;
+  let flushing = null;
+
+  function overallLevel() {
+    return A.alerts.some((a) => a.level === 'crit') ? 'crit' : A.alerts.some((a) => a.level === 'watch') ? 'watch' : 'ok';
+  }
+
+  function buildCloudRow() {
+    const p = state.profile || {};
+    const env = A.ctx.env;
+    const md = V.missionDay(state);
+    return {
+      client_id: V.newId(),
+      onboard_at: new Date().toISOString(),
+      astronaut: String(p.name || tx('Astronaut', 'Astronauta')).slice(0, 60),
+      mission: String(p.mission || '').slice(0, 60),
+      environment: env.id,
+      mission_day: md == null ? null : Math.max(0, Math.min(5000, Math.round(md))),
+      delay_sec: env.delaySec,
+      score: A.score == null ? null : Math.max(0, Math.min(100, Math.round(A.score))),
+      level: overallLevel(),
+      alert_count: A.alerts.filter((a) => a.level === 'crit' || a.level === 'watch').length,
+      lang: V.lang,
+      report: reportCache.slice(0, 20000)
+    };
+  }
+
+  function cloudErrorText(e) {
+    if (!e) return '';
+    if (e.kind === 'offline') return tx('No signal: Mission Control cannot be reached right now.', 'Sin señal: ahora no se puede contactar con el control de misión.');
+    if (e.kind === 'auth') return tx('Mission Control did not accept this device. Try again later.', 'El control de misión no aceptó este dispositivo. Inténtalo más tarde.');
+    if (e.kind === 'server') return tx('Mission Control is not responding. Try again in a few minutes.', 'El control de misión no responde. Inténtalo en unos minutos.');
+    return `${tx('Mission Control rejected the report', 'El control de misión rechazó el reporte')}: ${e.message}`;
+  }
+
+  /* Sends the reports waiting in the outbox, oldest first. Never throws. */
+  function flushOutbox(opts = {}) {
+    if (!cloudOn() || !state.outbox.length) return Promise.resolve({ sent: 0, error: null });
+    if (flushing) return flushing;
+    flushing = (async () => {
+      let sent = 0, error = null;
+      for (const item of state.outbox.slice()) {
+        if (item.error && !opts.all) continue; // refused before: retried only on request
+        try {
+          const got = await V.cloud.send(item.row);
+          state.outbox = state.outbox.filter((o) => o.row.client_id !== item.row.client_id);
+          if (got && got.id && Array.isArray(cloudRows)) cloudRows = [got].concat(cloudRows.filter((r) => r.client_id !== got.client_id));
+          sent++;
+        } catch (e) {
+          error = e;
+          if (e.kind === 'rejected') { item.error = e.message; continue; }
+          break; // no signal or server problem: keep the rest for later
+        }
+      }
+      V.saveState(state);
+      return { sent, error };
+    })().finally(() => { flushing = null; });
+    return flushing;
+  }
+
+  function afterFlush(res) {
+    if (res && res.sent) toast(tx(`${res.sent} queued report${res.sent > 1 ? 's' : ''} delivered to Mission Control`, `${res.sent} ${res.sent > 1 ? 'reportes pendientes entregados' : 'reporte pendiente entregado'} al control de misión`), 'info', 'send');
+    if (view === 'control' && $('#modal-root').hidden) renderControl();
+  }
+
+  function loadControl() {
+    if (!cloudOn() || cloudBusy) return;
+    cloudBusy = true;
+    cloudErr = null;
+    if (view === 'control') renderControl();
+    flushOutbox({ all: true })
+      .then(() => V.cloud.list(30))
+      .then((rows) => { cloudRows = Array.isArray(rows) ? rows : []; })
+      .catch((e) => { cloudErr = e; })
+      .finally(() => { cloudBusy = false; if (view === 'control') renderControl(); });
+  }
+
+  function discardQueued(id) {
+    state.outbox = state.outbox.filter((o) => o.row.client_id !== id);
+    V.saveState(state);
+    renderControl();
+    toast(tx('Report removed from the outbox', 'Reporte quitado de la bandeja de salida'), 'info', 'trash');
+  }
+
+  function renderControl() {
+    const on = cloudOn();
+    if (on && cloudRows === null && !cloudBusy && !cloudErr) { loadControl(); return; }
+    const env = A.ctx.env;
+    const devId = on ? V.cloud.deviceId() : null;
+    let st;
+    if (!on) st = ['none', tx('Simulated link', 'Enlace simulado'), tx('This copy of AstroHealth runs offline: reports are simulated and stay on this device.', 'Esta copia de AstroHealth funciona sin conexión: los reportes se simulan y se quedan en este dispositivo.')];
+    else if (cloudBusy) st = ['info', tx('Contacting Mission Control…', 'Contactando con el control de misión…'), tx('Sending queued reports and downloading the received ones.', 'Enviando los reportes pendientes y descargando los recibidos.')];
+    else if (cloudErr) st = [cloudErr.kind === 'offline' ? 'watch' : 'crit', cloudErr.kind === 'offline' ? tx('No signal', 'Sin señal') : tx('Link problem', 'Problema de enlace'), cloudErrorText(cloudErr)];
+    else st = ['ok', tx('Link established', 'Enlace establecido'), tx('Transmitted reports are stored in the Mission Control database and are available on Earth.', 'Los reportes transmitidos se guardan en la base de datos del control de misión y están disponibles en Tierra.')];
+    const rows = cloudRows || [];
+    const envShort = (id) => (V.ENVIRONMENTS[id] ? V.ENVIRONMENTS[id].short : id || '—');
+
+    const queued = state.outbox.map((o) => `
+      <li class="mc-queued">
+        <div class="rec-main"><span class="dot lvl-${esc(o.row.level)}" aria-hidden="true"></span><strong>${esc(V.fmtDateTime(o.row.onboard_at))}</strong>${pill(o.row.level)}
+          <span class="small ${o.error ? '' : 'muted'}">${o.error ? `${ic('alert')} ${esc(tx('Refused', 'Rechazado'))}: ${esc(o.error)}` : tx('Waiting for signal', 'Esperando señal')}</span></div>
+        ${o.error ? `<button type="button" class="icon-btn" data-action="cloud-discard" data-id="${esc(o.row.client_id)}" aria-label="${tx('Remove from the outbox', 'Quitar de la bandeja de salida')}" title="${tx('Remove from the outbox', 'Quitar de la bandeja de salida')}">${ic('trash')}</button>` : ''}
+      </li>`).join('');
+
+    const received = rows.map((r) => {
+      const lv = ['ok', 'watch', 'crit'].includes(r.level) ? r.level : 'none';
+      return `
+      <details class="mc-report lvl-${lv}">
+        <summary>
+          <span class="dot" aria-hidden="true"></span>
+          <span class="mc-main"><strong>${esc(V.fmtDateTime(r.created_at))}</strong>
+            <span class="small muted">${esc([r.astronaut, r.mission, envShort(r.environment), r.mission_day ? `${tx('day', 'día')} ${r.mission_day}` : ''].filter(Boolean).join(' · '))}</span></span>
+          <span class="mc-tags">${lv === 'none' ? '' : pill(lv)}${r.score == null ? '' : `<span class="mc-score" title="${tx('AstroHealth score', 'Índice AstroHealth')}">${r.score}</span>`}</span>
+        </summary>
+        <div class="mc-body">
+          <p class="small muted">${tx('Generated on board', 'Generado a bordo')}: ${esc(r.onboard_at ? V.fmtDateTime(r.onboard_at) : '—')} · ${tx('Stored in the database', 'Guardado en la base de datos')}: ${esc(V.fmtDateTime(r.created_at))}${r.delay_sec ? ` · ${tx('On a real mission it reaches Earth after', 'En una misión real llega a la Tierra tras')} ${esc(V.fmtDelay(Number(r.delay_sec)))}` : ''}</p>
+          <pre class="report">${esc(r.report)}</pre>
+        </div>
+      </details>`;
+    }).join('');
+
+    $('#view-control').innerHTML = `
+      <div class="page-head"><div><h1>${tx('Mission Control', 'Control de misión')}</h1><p class="muted">${tx('Reports this device has transmitted to the flight surgeons on Earth.', 'Reportes que este dispositivo ha transmitido a los cirujanos de vuelo en la Tierra.')}</p></div>
+        <button type="button" class="btn btn-primary" data-action="report">${ic('send')} ${tx('New report', 'Nuevo reporte')}</button></div>
+
+      <div class="card mc-link">
+        <div class="mc-status lvl-${st[0]}" role="status">${ic(st[0] === 'ok' ? 'signal' : st[0] === 'info' ? 'clock' : st[0] === 'none' ? 'info' : 'alert')}<div><strong>${st[1]}</strong><span class="small muted">${esc(st[2])}</span></div></div>
+        <ul class="mc-facts">
+          <li><span>${tx('Database', 'Base de datos')}</span><strong>${on ? tx('Supabase (cloud)', 'Supabase (nube)') : tx('None (offline)', 'Ninguna (sin conexión)')}</strong></li>
+          <li><span>${tx('Anonymous device ID', 'ID anónimo del dispositivo')}</span><strong class="mono">${devId ? esc(devId) : '—'}</strong></li>
+          <li><span>${tx('One-way delay', 'Retardo de ida')}</span><strong>${esc(V.fmtDelay(env.delaySec))}</strong></li>
+          <li><span>${tx('In the outbox', 'En la bandeja de salida')}</span><strong>${state.outbox.length}</strong></li>
+        </ul>
+        ${on ? `<div class="btn-row"><button type="button" class="btn" data-action="cloud-refresh" ${cloudBusy ? 'disabled' : ''}>${ic('down')} ${state.outbox.length ? tx('Send queued and refresh', 'Enviar pendientes y actualizar') : tx('Refresh', 'Actualizar')}</button></div>` : ''}
+      </div>
+
+      ${state.outbox.length ? `
+      <div class="section-head"><h2>${tx('Outbox', 'Bandeja de salida')}</h2><span class="muted small">${tx('Saved on board until there is a signal', 'Guardados a bordo hasta que haya señal')}</span></div>
+      <div class="card"><ul class="rec-list">${queued}</ul></div>` : ''}
+
+      ${on ? `
+      <div class="section-head"><h2>${tx('Received on Earth', 'Recibidos en la Tierra')}</h2><span class="muted small">${cloudRows ? tx(`${rows.length} report${rows.length === 1 ? '' : 's'}`, `${rows.length} reporte${rows.length === 1 ? '' : 's'}`) : ''}</span></div>
+      <div class="card">${rows.length
+        ? `<div class="mc-list">${received}</div>`
+        : `<div class="empty">${ic('send')}<p>${cloudBusy || cloudRows === null ? tx('Loading…', 'Cargando…') : tx('No reports yet. Use Report to Earth to send the first one.', 'Todavía no hay reportes. Usa «Reporte a Tierra» para enviar el primero.')}</p></div>`}</div>` : ''}
+
+      <p class="callout">${ic('lock')}<span>${on
+        ? tx('Privacy: reports are linked to an anonymous ID for this browser, and database rules (row-level security) stop anyone else from reading them. AstroHealth is a prototype, not a medical system: use fictional or demo data only. "Delete everything" in Settings also deletes them from the database.', 'Privacidad: los reportes se vinculan a un ID anónimo de este navegador y las reglas de la base de datos (seguridad a nivel de fila) impiden que nadie más los lea. AstroHealth es un prototipo, no un sistema médico: usa solo datos ficticios o de demostración. «Borrar todo» en Ajustes también los borra de la base de datos.')
+        : tx('Nothing leaves this device: the transmission to Earth is a simulation.', 'Nada sale de este dispositivo: la transmisión a Tierra es una simulación.')}</span></p>`;
   }
 
   /* ================================================================ Toasts */
@@ -1414,6 +1610,8 @@
       case 'import': $('#import-file').click(); break;
       case 'wipe': wipe(); break;
       case 'del-record': delRecord(el.dataset.id); break;
+      case 'cloud-refresh': loadControl(); break;
+      case 'cloud-discard': discardQueued(el.dataset.id); break;
       default: break;
     }
   }
@@ -1426,7 +1624,7 @@
     const nav = t.closest('#nav [data-view]');
     if (nav) { setView(nav.dataset.view); return; }
     const vl = t.closest('[data-view-link]');
-    if (vl) { setView(vl.dataset.viewLink); return; }
+    if (vl) { closeModal(true); setView(vl.dataset.viewLink); return; }
     if (t.closest('[data-close-btn]')) { closeModal(); return; }
     const tr = t.closest('[data-trend]');
     if (tr) { trendSel = tr.dataset.trend; closeModal(true); setView('trends'); return; }
@@ -1508,7 +1706,14 @@
       renderSidebarXP();
       renderReminder();
       if (view === 'dashboard' && $('#modal-root').hidden) renderDashboard();
+      if (cloudOn() && state.outbox.some((o) => !o.error)) flushOutbox().then(afterFlush);
     }, 60000);
+
+    // Store-and-forward: queued reports leave as soon as the link is back
+    if (cloudOn()) {
+      window.addEventListener('online', () => flushOutbox().then(afterFlush));
+      if (state.outbox.length) setTimeout(() => flushOutbox().then(afterFlush), 2500);
+    }
   }
 
   init();
