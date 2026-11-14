@@ -2,7 +2,9 @@
 
 **NASA Space Apps Challenge 2026 · Challenge: *Create Health Monitoring Software for Astronauts on Space Missions***
 
-**▶ Live app: [sernita-hub.github.io/astrohealth](https://sernita-hub.github.io/astrohealth/)** · Source code: [github.com/Sernita-hub/astrohealth](https://github.com/Sernita-hub/astrohealth)
+**▶ Live app: [astrohealth-wtfb.onrender.com](https://astrohealth-wtfb.onrender.com/)** · Mirror: [sernita-hub.github.io/astrohealth](https://sernita-hub.github.io/astrohealth/) · Source code: [github.com/Sernita-hub/astrohealth](https://github.com/Sernita-hub/astrohealth)
+
+No account or sign-up needed: open the link and the demo mission loads.
 
 AstroHealth is a visual health self-assessment tool for astronauts on long-duration missions. Crew members log their health indicators, instantly see what each value means in the space environment, and know what to do next: act on their own, alert the Crew Medical Officer, or send a report to the flight surgeon on Earth.
 
@@ -12,7 +14,7 @@ It is built to work offline, as it would aboard a spacecraft: no installation an
 
 ## How to run it
 
-1. Open the **[live app](https://sernita-hub.github.io/astrohealth/)**, or download this repository and open `index.html` in a modern browser (Chrome, Edge, Firefox or Safari).
+1. Open the **[live app](https://astrohealth-wtfb.onrender.com/)**, or download this repository and open `index.html` in a modern browser (Chrome, Edge, Firefox or Safari).
 2. On first launch it opens with a **demo mission**: 30 days of simulated data from a transit to Mars. From the welcome card you can choose **Set up my own mission** to start from scratch.
 
 Optionally, with a local server:
