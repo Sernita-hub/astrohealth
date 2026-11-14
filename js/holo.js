@@ -29,19 +29,28 @@
   /* ============================================================ Geometry */
   // Units are metres: feet at y = 0, top of the head at y ≈ 1.78, +z faces the viewer.
   class Mesh {
-    constructor() { this.v = []; this.s = []; this.d = []; }
-    line(pts, closed) {
+    constructor() { this.v = []; this.n = []; this.s = []; this.d = []; this.f = []; }
+    // Polyline; `normals` (one per point, or a single shared one) enables rim lighting
+    line(pts, closed, normals) {
       const base = this.v.length / 3;
-      pts.forEach((p) => this.v.push(p[0], p[1], p[2]));
+      pts.forEach((p, i) => {
+        this.v.push(p[0], p[1], p[2]);
+        if (normals) { const q = Array.isArray(normals[0]) ? normals[i] : normals; this.n.push(q[0], q[1], q[2]); }
+      });
       for (let i = 0; i < pts.length - 1; i++) this.s.push(base + i, base + i + 1);
       if (closed && pts.length > 2) this.s.push(base + pts.length - 1, base);
-      return this;
+      return base;
     }
+    fill(base, count) { this.f.push(base, count); }
     dots(pts) { pts.forEach((p) => this.d.push(p[0], p[1], p[2])); return this; }
     done(extra) {
-      const m = Object.assign({ verts: new Float32Array(this.v), segs: new Uint32Array(this.s), dots: new Float32Array(this.d) }, extra || {});
-      m.P = new Float32Array(m.verts.length); // projected vertices (x, y, depth)
-      m.Q = new Float32Array(m.dots.length);  // projected dots
+      const m = Object.assign({
+        verts: new Float32Array(this.v), segs: new Uint32Array(this.s), dots: new Float32Array(this.d),
+        norms: this.n.length ? new Float32Array(this.n) : null, fills: new Uint32Array(this.f)
+      }, extra || {});
+      m.P = new Float32Array(m.verts.length);     // projected vertices (x, y, depth)
+      m.Q = new Float32Array(m.dots.length);      // projected dots
+      m.SH = new Float32Array(m.verts.length / 3); // rim-light shade per vertex
       return m;
     }
   }
@@ -124,46 +133,242 @@
     }
   }
 
-  const TORSO = [
-    // y, half width, half depth, forward offset
-    [0.86, 0.128, 0.094, 0], [0.92, 0.165, 0.108, 0], [0.99, 0.172, 0.11, 0.002], [1.06, 0.158, 0.1, 0.006],
-    [1.13, 0.143, 0.097, 0.01], [1.2, 0.148, 0.103, 0.014], [1.27, 0.162, 0.113, 0.02], [1.34, 0.17, 0.117, 0.022],
-    [1.4, 0.178, 0.11, 0.014], [1.45, 0.186, 0.096, 0.002], [1.49, 0.14, 0.078, -0.004], [1.52, 0.075, 0.062, -0.004]
-  ];
+  /* ---------------------------------------------- Anatomical body surface */
+  const gauss = (d, w) => Math.exp(-(d * d) / (w * w));
 
-  function torso(m) {
-    const n = 26, rings = [], last = TORSO[TORSO.length - 1][0];
-    for (let y = TORSO[0][0]; y <= last + 1e-6; y += 0.03) {
-      let i = 0;
-      while (i < TORSO.length - 2 && TORSO[i + 1][0] < y) i++;
-      const a = TORSO[i], b = TORSO[i + 1];
-      let t = clamp((y - a[0]) / (b[0] - a[0]), 0, 1);
-      t = t * t * (3 - 2 * t);
-      const ring = circle([0, y, lerp(a[3], b[3], t)], [1, 0, 0], [0, 0, 1], lerp(a[1], b[1], t), lerp(a[2], b[2], t), n);
-      rings.push(ring);
-      m.line(ring, true);
-    }
-    for (let j = 0; j < 10; j++) {
-      const idx = Math.round((j * n) / 10) % n;
-      m.line(rings.map((r) => r[idx]), false);
-    }
+  // Interpolates a table of rows [key, ...values] at `key` (smooth between rows)
+  function rowAt(rows, key) {
+    let i = 0;
+    while (i < rows.length - 2 && rows[i + 1][0] < key) i++;
+    const a = rows[i], b = rows[i + 1];
+    let t = clamp((key - a[0]) / (b[0] - a[0]), 0, 1);
+    t = t * t * (3 - 2 * t);
+    return a.map((v, k) => lerp(v, b[k], t));
   }
+
+  // Cross-section: a superellipse with its own front and back depth, plus radial bumps
+  // (muscles, bones). Angle 0 points along `lat`, PI/2 along `fwd` (the front).
+  function section(c, lat, fwd, rl, rf, rb, e, bumps, n) {
+    const pts = [], k = 2 / e;
+    for (let i = 0; i < n; i++) {
+      const th = (i / n) * TAU, co = Math.cos(th), si = Math.sin(th);
+      let bx = Math.sign(co) * Math.pow(Math.abs(co), k) * rl;
+      let bz = Math.sign(si) * Math.pow(Math.abs(si), k) * (si >= 0 ? rf : rb);
+      let b = 0;
+      if (bumps) for (let j = 0; j < bumps.length; j++) b += bumps[j][2] * gauss(wrap(th - bumps[j][0]), bumps[j][1]);
+      if (b) { const l = Math.hypot(bx, bz) || 1; bx += (bx / l) * b; bz += (bz / l) * b; }
+      pts.push([c[0] + lat[0] * bx + fwd[0] * bz, c[1] + lat[1] * bx + fwd[1] * bz, c[2] + lat[2] * bx + fwd[2] * bz]);
+    }
+    return pts;
+  }
+
+  // Surface through a stack of sections: every ring, every `mstep`-th lengthwise line,
+  // per-vertex normals (for rim lighting) and translucent ring fills (for volume)
+  function loft(m, rings, mstep) {
+    const R = rings.length, n = rings[0].length;
+    const centers = rings.map((r) => {
+      const c = [0, 0, 0];
+      r.forEach((p) => { c[0] += p[0] / n; c[1] += p[1] / n; c[2] += p[2] / n; });
+      return c;
+    });
+    const normals = rings.map((ring, i) => ring.map((p, j) => {
+      const tr = sub(ring[(j + 1) % n], ring[(j - 1 + n) % n]);
+      const tl = sub(rings[Math.min(R - 1, i + 1)][j], rings[Math.max(0, i - 1)][j]);
+      const out = sub(p, centers[i]);
+      let nv = cross(tr, tl);
+      if (Math.hypot(nv[0], nv[1], nv[2]) < 1e-12) nv = out;
+      nv = norm(nv);
+      return nv[0] * out[0] + nv[1] * out[1] + nv[2] * out[2] < 0 ? [-nv[0], -nv[1], -nv[2]] : nv;
+    }));
+    rings.forEach((r, i) => {
+      const base = m.line(r, true, normals[i]);
+      if (i % 2 === 0) m.fill(base, n);
+    });
+    for (let j = 0; j < n; j += mstep) m.line(rings.map((r) => r[j]), false, normals.map((nr) => nr[j]));
+  }
+
+  // Smooth curve through control points (Catmull-Rom), with arc-length lookup
+  function curve(ctrl) {
+    const pts = [];
+    for (let i = 0; i < ctrl.length - 1; i++) {
+      const p0 = ctrl[Math.max(0, i - 1)], p1 = ctrl[i], p2 = ctrl[i + 1], p3 = ctrl[Math.min(ctrl.length - 1, i + 2)];
+      for (let k = 0; k < 20; k++) {
+        const t = k / 20, t2 = t * t, t3 = t2 * t;
+        pts.push([0, 1, 2].map((d) => 0.5 * (2 * p1[d] + (-p0[d] + p2[d]) * t + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t2 + (-p0[d] + 3 * p1[d] - 3 * p2[d] + p3[d]) * t3)));
+      }
+    }
+    pts.push(ctrl[ctrl.length - 1].slice());
+    return withLengths(pts);
+  }
+
+  // Limb: sections swept along a curve; prof(u) gives [lateral, front, back, bumps]
+  function sweep(m, ctrl, prof, opts = {}) {
+    const path = curve(ctrl), n = opts.n || 16, e = opts.e || 2;
+    const K = Math.max(3, Math.round(path.total / (opts.step || 0.02)));
+    const rings = [];
+    for (let k = 0; k <= K; k++) {
+      const u = k / K, p = pointOn(path, u);
+      const tan = norm(sub(pointOn(path, Math.min(1, u + 0.01)), pointOn(path, Math.max(0, u - 0.01))));
+      let lat = cross(tan, [0, 0, 1]);
+      if (Math.hypot(lat[0], lat[1], lat[2]) < 1e-3) lat = cross(tan, [1, 0, 0]);
+      lat = norm(lat);
+      const fwd = norm(cross(lat, tan)), r = prof(u);
+      rings.push(section(p, lat, fwd, r[0], r[1], r[2], e, r[3], n));
+    }
+    loft(m, rings, opts.mstep || 2);
+  }
+
+  // Torso rows: y, half width, front depth, back depth, forward offset, pectorals, glutes, shoulder blades, spine groove
+  const TORSO = [
+    [0.84, 0.1, 0.065, 0.07, 0, 0, 0, 0, 0],
+    [0.88, 0.15, 0.08, 0.095, 0, 0, 0.018, 0, 0.004],
+    [0.93, 0.172, 0.088, 0.104, 0, 0, 0.026, 0, 0.006],
+    [0.98, 0.172, 0.088, 0.1, 0, 0, 0.018, 0, 0.006],
+    [1.04, 0.158, 0.088, 0.088, 0, 0, 0.004, 0, 0.006],
+    [1.1, 0.146, 0.088, 0.08, 0, 0, 0, 0, 0.007],
+    [1.15, 0.14, 0.088, 0.078, 0, 0, 0, 0, 0.007],
+    [1.21, 0.146, 0.094, 0.082, 0, 0.002, 0, 0.002, 0.007],
+    [1.27, 0.158, 0.1, 0.088, 0, 0.012, 0, 0.006, 0.007],
+    [1.33, 0.168, 0.104, 0.094, 0, 0.018, 0, 0.012, 0.007],
+    [1.39, 0.176, 0.098, 0.096, 0, 0.012, 0, 0.014, 0.006],
+    [1.435, 0.19, 0.082, 0.088, -0.004, 0.002, 0, 0.01, 0.005],
+    [1.47, 0.176, 0.068, 0.076, -0.008, 0, 0, 0.004, 0.004],
+    [1.495, 0.14, 0.06, 0.07, -0.01, 0, 0, 0, 0.002],
+    [1.515, 0.095, 0.056, 0.064, -0.012, 0, 0, 0, 0],
+    [1.53, 0.066, 0.054, 0.058, -0.014, 0, 0, 0, 0]
+  ];
+  // Head rows: y, half width, front depth, back depth, forward offset, nose, brow, eye sockets
+  const HEAD = [
+    [1.552, 0.022, 0.012, 0.012, 0.07, 0, 0, 0],
+    [1.565, 0.035, 0.02, 0.035, 0.06, 0, 0, 0],
+    [1.58, 0.048, 0.025, 0.06, 0.05, 0, 0, 0],
+    [1.595, 0.058, 0.03, 0.075, 0.045, 0.002, 0, 0],
+    [1.615, 0.066, 0.035, 0.09, 0.04, 0.012, 0, 0],
+    [1.635, 0.071, 0.042, 0.1, 0.035, 0.022, 0, 0.002],
+    [1.655, 0.074, 0.05, 0.105, 0.03, 0.012, 0, 0.007],
+    [1.675, 0.075, 0.055, 0.108, 0.025, 0.004, 0.005, 0.002],
+    [1.7, 0.075, 0.058, 0.108, 0.02, 0, 0.001, 0],
+    [1.725, 0.071, 0.055, 0.103, 0.015, 0, 0, 0],
+    [1.75, 0.062, 0.046, 0.09, 0.01, 0, 0, 0],
+    [1.768, 0.047, 0.034, 0.07, 0.005, 0, 0, 0],
+    [1.78, 0.024, 0.018, 0.036, 0.005, 0, 0, 0],
+    [1.785, 0.005, 0.004, 0.006, 0.005, 0, 0, 0]
+  ];
+  // Limb profiles: u along the limb (0 = top), lateral, front, back
+  const ARM = [
+    [0, 0.05, 0.05, 0.05], [0.06, 0.056, 0.05, 0.052], [0.16, 0.05, 0.044, 0.046], [0.3, 0.041, 0.044, 0.042],
+    [0.44, 0.037, 0.036, 0.04], [0.53, 0.035, 0.031, 0.035], [0.6, 0.038, 0.035, 0.034], [0.72, 0.033, 0.03, 0.029],
+    [0.88, 0.028, 0.022, 0.022], [1, 0.026, 0.018, 0.018]
+  ];
+  const LEG = [
+    [0, 0.086, 0.085, 0.09], [0.1, 0.082, 0.083, 0.084], [0.25, 0.072, 0.077, 0.07], [0.4, 0.06, 0.064, 0.058],
+    [0.48, 0.05, 0.052, 0.048], [0.52, 0.048, 0.055, 0.046], [0.58, 0.046, 0.044, 0.05], [0.66, 0.047, 0.04, 0.062],
+    [0.75, 0.042, 0.036, 0.052], [0.86, 0.034, 0.031, 0.036], [0.95, 0.03, 0.028, 0.03], [1, 0.03, 0.028, 0.03]
+  ];
+  // Foot rows: z, x, y, half width, top height, sole depth
+  const FOOT = [
+    [-0.05, 0.1, 0.035, 0.022, 0.03, 0.03], [-0.035, 0.1, 0.038, 0.03, 0.036, 0.034], [0, 0.1, 0.045, 0.036, 0.042, 0.04],
+    [0.04, 0.102, 0.04, 0.04, 0.036, 0.034], [0.08, 0.104, 0.03, 0.043, 0.026, 0.026], [0.12, 0.106, 0.022, 0.044, 0.016, 0.018],
+    [0.15, 0.106, 0.017, 0.04, 0.011, 0.013], [0.17, 0.105, 0.014, 0.03, 0.008, 0.01], [0.178, 0.105, 0.013, 0.012, 0.004, 0.006]
+  ];
+  // Joint positions shared by the skin, skeleton, vessels and muscles
+  const J = (s) => ({
+    shoulder: [s * 0.19, 1.445, -0.008], elbow: [s * 0.252, 1.17, -0.012], wrist: [s * 0.293, 0.93, 0.03],
+    hip: [s * 0.09, 0.93, 0], knee: [s * 0.095, 0.5, 0.012], ankle: [s * 0.1, 0.08, -0.012]
+  });
 
   function buildBody() {
     const m = new Mesh();
-    torso(m);
-    tube(m, [0, 1.51, -0.002], [0, 1.585, 0.004], 0.052, 0.047, 16, 0.025, 4); // neck
-    ellipsoid(m, [0, 1.668, 0.006], [0.082, 0.112, 0.097], 12, 22, 8);         // head
+    const X = [1, 0, 0], Y = [0, 1, 0], Z = [0, 0, 1];
+
+    // Torso: chest, back, waist and hips
+    let rings = [];
+    for (let y = TORSO[0][0]; y <= 1.53 + 1e-6; y += 0.022) {
+      const r = rowAt(TORSO, y), h = Math.PI / 2;
+      rings.push(section([0, y, r[4]], X, Z, r[1], r[2], r[3], 2.5, [
+        [h - 0.5, 0.42, r[5]], [h + 0.5, 0.42, r[5]], [-h - 0.55, 0.5, r[6]], [-h + 0.55, 0.5, r[6]],
+        [-h - 0.75, 0.45, r[7]], [-h + 0.75, 0.45, r[7]], [-h, 0.12, -r[8]]
+      ], 32));
+    }
+    loft(m, rings, 2);
+
+    // Neck
+    sweep(m, [[0, 1.48, -0.012], [0, 1.54, -0.014], [0, 1.6, -0.02]], (u) => [0.06 - 0.006 * u, 0.054 - 0.004 * u, 0.058 - 0.004 * u], { n: 20, step: 0.02, mstep: 2 });
+
+    // Head: jaw, chin, nose, brow, eye sockets and skull
+    rings = [];
+    for (let y = HEAD[0][0]; y <= 1.785 + 1e-6; y += 0.011) {
+      const r = rowAt(HEAD, y), h = Math.PI / 2;
+      rings.push(section([0, y, r[4]], X, Z, r[1], r[2], r[3], 2.2, [
+        [h, 0.16, r[5]], [h - 0.45, 0.3, r[6]], [h + 0.45, 0.3, r[6]], [h - 0.42, 0.16, -r[7]], [h + 0.42, 0.16, -r[7]]
+      ], 28));
+    }
+    loft(m, rings, 2);
+
+    // Face details and ears: a separate, brighter mesh so the face reads clearly
+    const dm = new Mesh();
+    const mouth = [], browL = [], browR = [];
+    for (let i = 0; i <= 10; i++) {
+      const x = lerp(-0.022, 0.022, i / 10);
+      mouth.push([x, 1.597 + 0.0025 * Math.cos((x / 0.022) * Math.PI / 2), 0.074 - x * x * 6]);
+      const bx = lerp(0.012, 0.05, i / 10);
+      browL.push([bx, 1.674 + 0.004 * Math.sin((i / 10) * Math.PI), 0.081 - bx * bx * 7]);
+      browR.push([-bx, 1.674 + 0.004 * Math.sin((i / 10) * Math.PI), 0.081 - bx * bx * 7]);
+    }
+    [mouth, browL, browR].forEach((l) => dm.line(l, false));
+    dm.line(mouth.map((p) => [p[0] * 0.8, p[1] - 0.006 - 0.003 * Math.cos((p[0] / 0.022) * Math.PI / 2), p[2] - 0.002]), false); // lower lip
+    dm.line([[0, 1.672, 0.083], [0, 1.65, 0.092], [0, 1.632, 0.1], [0, 1.621, 0.09]], false); // nose
     S.forEach((s) => {
-      ellipsoid(m, [s * 0.198, 1.438, -0.002], [0.058, 0.05, 0.056], 5, 14, 0);  // shoulder
-      tube(m, [s * 0.205, 1.43, -0.004], [s * 0.262, 1.17, 0], 0.048, 0.037, 14);  // upper arm
-      tube(m, [s * 0.262, 1.17, 0], [s * 0.3, 0.925, 0.038], 0.036, 0.027, 12);    // forearm
-      ellipsoid(m, [s * 0.311, 0.85, 0.05], [0.022, 0.066, 0.04], 6, 12, 4);       // hand
-      tube(m, [s * 0.086, 0.9, 0], [s * 0.094, 0.5, 0.012], 0.08, 0.05, 16);       // thigh
-      tube(m, [s * 0.094, 0.5, 0.012], [s * 0.098, 0.085, -0.012], 0.048, 0.03, 14); // shin
-      ellipsoid(m, [s * 0.1, 0.036, 0.045], [0.04, 0.034, 0.105], 5, 14, 4);      // foot
+      dm.line([[0, 1.621, 0.09], [s * 0.012, 1.622, 0.085], [s * 0.017, 1.628, 0.08]], false); // nostril
+      dm.line([[s * 0.072, 1.625, -0.006], [s * 0.062, 1.588, 0.018], [s * 0.034, 1.562, 0.058], [0, 1.553, 0.074]], false); // jaw
+      dm.line([[s * 0.058, 1.645, 0.06], [s * 0.066, 1.628, 0.045]], false); // cheekbone
+      const ear = [], inner = [];
+      for (let i = 0; i < 18; i++) {
+        const a = (i / 18) * TAU;
+        ear.push([s * 0.075, 1.65 + Math.sin(a) * 0.03, -0.012 + Math.cos(a) * 0.016 * (Math.sin(a) > 0 ? 1 : 0.8)]);
+        inner.push([s * 0.077, 1.652 + Math.sin(a) * 0.017, -0.012 + Math.cos(a) * 0.008]);
+      }
+      dm.line(ear, true);
+      dm.line(inner, true);
     });
-    return m.done();
+
+    S.forEach((s) => {
+      const j = J(s);
+      // Arm: deltoid, biceps and triceps, elbow, forearm, wrist
+      sweep(m, [j.shoulder, j.elbow, j.wrist], (u) => rowAt(ARM, u).slice(1), { n: 18, step: 0.02 });
+
+      // Hand: palm facing the thigh, four fingers and a thumb
+      rings = [];
+      [[0.93, 0, 0.018, 0.024, 0.024], [0.905, 0.002, 0.016, 0.034, 0.03], [0.875, 0.004, 0.015, 0.04, 0.036],
+        [0.85, 0.005, 0.013, 0.042, 0.038], [0.838, 0.005, 0.011, 0.04, 0.036]].forEach((r, i, all) => {
+        if (i === 0) return;
+        const a = all[i - 1];
+        for (let k = 0; k < 3; k++) {
+          const t = k / 3, row = a.map((v, q) => lerp(v, r[q], t));
+          rings.push(section([s * (0.293 + row[1]), row[0], 0.032], X, Z, row[2], row[3], row[4], 3, null, 14));
+        }
+      });
+      loft(m, rings, 2);
+      [[-0.028, 0.058, 0.0075], [-0.009, 0.07, 0.0085], [0.01, 0.076, 0.009], [0.028, 0.07, 0.0085]].forEach(([dz, L, r]) => {
+        const z = 0.032 + dz, x0 = s * 0.298;
+        sweep(m, [[x0, 0.842, z], [x0 - s * 0.004, 0.842 - L * 0.5, z + 0.003], [x0 - s * 0.012, 0.842 - L, z + 0.004]],
+          (u) => [r * (1 - 0.25 * u), r * (1 - 0.25 * u), r * (1 - 0.25 * u)], { n: 8, step: 0.012, mstep: 4 });
+      });
+      sweep(m, [[s * 0.29, 0.905, 0.062], [s * 0.284, 0.875, 0.078], [s * 0.278, 0.85, 0.084]],
+        (u) => [0.011 * (1 - 0.25 * u), 0.011 * (1 - 0.25 * u), 0.011 * (1 - 0.25 * u)], { n: 8, step: 0.012, mstep: 4 });
+
+      // Leg: thigh with quadriceps, kneecap, calf, ankle
+      sweep(m, [j.hip, j.knee, j.ankle], (u) => rowAt(LEG, u).slice(1), { n: 20, step: 0.022 });
+
+      // Foot: heel, arch and toes, with a flat sole
+      rings = [];
+      for (let z = FOOT[0][0]; z <= 0.178 + 1e-6; z += 0.012) {
+        const r = rowAt(FOOT, z);
+        rings.push(section([s * r[1], r[2], z], X, Y, r[3], r[4], r[5], 2.4, null, 16));
+      }
+      loft(m, rings, 2);
+    });
+    return m.done({ details: dm.done() });
   }
 
   function withLengths(pts) {
@@ -187,20 +392,21 @@
 
     // Brain: mesh, midline fissure and neural "point cloud"
     m = new Mesh();
-    ellipsoid(m, [0, 1.697, 0.002], [0.066, 0.055, 0.078], 7, 20, 6);
+    ellipsoid(m, [0, 1.71, -0.01], [0.062, 0.05, 0.074], 7, 20, 6);
     const fissure = [];
-    for (let i = 0; i <= 16; i++) { const a = (i / 16) * Math.PI; fissure.push([0, 1.697 + Math.sin(a) * 0.058, 0.002 - Math.cos(a) * 0.08]); }
+    for (let i = 0; i <= 16; i++) { const a = (i / 16) * Math.PI; fissure.push([0, 1.71 + Math.sin(a) * 0.053, -0.01 - Math.cos(a) * 0.076]); }
     m.line(fissure, false);
-    cloud(m, [0, 1.697, 0.002], [0.063, 0.052, 0.075], 170, rnd);
+    S.forEach((s) => m.line(circle([s * 0.03, 1.665, -0.07], [1, 0, 0], [0, 1, 0], 0.026, 0.016, 14), true)); // cerebellum
+    cloud(m, [0, 1.71, -0.01], [0.059, 0.047, 0.071], 170, rnd);
     O.brain = m.done();
 
     // Eyes and optic nerves
     m = new Mesh();
     S.forEach((s) => {
-      const c = [s * 0.032, 1.648, 0.085];
-      m.line(circle(c, [1, 0, 0], [0, 1, 0], 0.016, 0.011, 18), true);
-      m.line(circle(c, [1, 0, 0], [0, 1, 0], 0.006, 0.006, 10), true);
-      m.line([[s * 0.032, 1.648, 0.075], [s * 0.016, 1.66, 0.03], [0, 1.672, 0]], false);
+      const c = [s * 0.031, 1.652, 0.07];
+      m.line(circle(c, [1, 0, 0], [0, 1, 0], 0.015, 0.009, 18), true);
+      m.line(circle(c, [1, 0, 0], [0, 1, 0], 0.0055, 0.0055, 10), true);
+      m.line([[s * 0.031, 1.652, 0.06], [s * 0.016, 1.664, 0.03], [0, 1.676, 0]], false);
     });
     O.eyes = m.done();
 
@@ -224,7 +430,7 @@
     const paths = [[[0.03, 1.3, 0.03], [0.02, 1.36, 0.02], [0, 1.38, -0.01], [-0.005, 1.3, -0.035], [0, 1.1, -0.03], [0, 0.97, -0.01]]];
     S.forEach((s) => {
       paths.push([[0, 0.97, -0.01], [s * 0.07, 0.9, 0.02], [s * 0.092, 0.7, 0.03], [s * 0.096, 0.5, 0.025], [s * 0.098, 0.3, 0], [s * 0.1, 0.1, -0.005]]);
-      paths.push([[0, 1.38, 0], [s * 0.1, 1.43, 0.005], [s * 0.2, 1.43, 0], [s * 0.262, 1.17, 0.015], [s * 0.3, 0.925, 0.045], [s * 0.311, 0.85, 0.055]]);
+      paths.push([[0, 1.38, 0], [s * 0.1, 1.43, 0.005], [s * 0.19, 1.425, -0.004], [s * 0.252, 1.17, 0.004], [s * 0.293, 0.93, 0.042], [s * 0.298, 0.86, 0.045]]);
       paths.push([[s * 0.012, 1.4, 0.015], [s * 0.025, 1.52, 0.02], [s * 0.03, 1.6, 0.02]]);
     });
     m = new Mesh();
@@ -273,22 +479,31 @@
     m.line(circle([0, 0.96, 0], [1, 0, 0], [0, 0, 1], 0.125, 0.075, 22), true);
     m.line(circle([0, 0.9, 0.01], [1, 0, 0], [0, 0, 1], 0.085, 0.055, 18), true);
     S.forEach((s) => {
-      m.line([[s * 0.01, 1.47, 0.07], [s * 0.1, 1.475, 0.04], [s * 0.19, 1.46, 0]], false);
-      m.line([[s * 0.2, 1.44, 0], [s * 0.262, 1.17, 0]], false);
-      m.line([[s * 0.262, 1.17, 0], [s * 0.296, 0.925, 0.032]], false);
-      m.line([[s * 0.268, 1.165, 0.008], [s * 0.306, 0.925, 0.046]], false);
-      m.line([[s * 0.1, 0.93, 0], [s * 0.094, 0.5, 0.012]], false);
-      m.line([[s * 0.094, 0.5, 0.012], [s * 0.098, 0.09, -0.01]], false);
-      m.line(circle([s * 0.095, 0.5, 0.014], [1, 0, 0], [0, 1, 0], 0.02, 0.02, 10), true);
+      const j = J(s);
+      m.line([[s * 0.01, 1.47, 0.06], [s * 0.1, 1.475, 0.035], [s * 0.18, 1.46, -0.005]], false); // clavicle
+      m.line([[s * 0.06, 1.42, -0.07], [s * 0.15, 1.43, -0.065], [s * 0.1, 1.3, -0.07], [s * 0.06, 1.42, -0.07]], false); // shoulder blade
+      m.line([j.shoulder, j.elbow], false);                                                  // humerus
+      m.line([j.elbow, [s * 0.288, 0.93, 0.022]], false);                                    // ulna
+      m.line([[s * 0.258, 1.165, -0.004], [s * 0.298, 0.93, 0.038]], false);                  // radius
+      [-0.028, -0.009, 0.01, 0.028].forEach((dz) => m.line([[s * 0.296, 0.9, 0.032 + dz * 0.5], [s * 0.298, 0.842, 0.032 + dz], [s * 0.288, 0.78, 0.036 + dz]], false));
+      m.line([[s * 0.085, 0.95, 0], j.knee], false);                                          // femur
+      m.line([j.knee, j.ankle], false);                                                        // tibia
+      m.line([[s * 0.11, 0.49, 0.0], [s * 0.112, 0.09, -0.02]], false);                        // fibula
+      m.line(circle([s * 0.095, 0.5, 0.05], [1, 0, 0], [0, 1, 0], 0.02, 0.022, 10), true);   // kneecap
+      m.line([[s * 0.1, 0.03, -0.04], [s * 0.1, 0.045, 0.02], [s * 0.104, 0.02, 0.15]], false); // foot
     });
+    // Skull outline
+    m.line(circle([0, 1.69, -0.005], [0, 1, 0], [0, 0, 1], 0.085, 0.1, 28), true);
+    m.line(circle([0, 1.69, -0.005], [1, 0, 0], [0, 0, 1], 0.07, 0.1, 24), true);
     O.bones = m.done();
 
     // Muscles: fibres on thighs, calves, upper arms and chest
     m = new Mesh();
     S.forEach((s) => {
-      fibers(m, [s * 0.086, 0.9, 0], [s * 0.094, 0.5, 0.012], 0.08, 0.05, 7);
-      fibers(m, [s * 0.094, 0.5, 0.012], [s * 0.098, 0.085, -0.012], 0.048, 0.03, 5, true);
-      fibers(m, [s * 0.205, 1.43, -0.004], [s * 0.262, 1.17, 0], 0.048, 0.037, 5);
+      const j = J(s);
+      fibers(m, [s * 0.09, 0.88, 0.004], j.knee, 0.074, 0.047, 7);
+      fibers(m, [s * 0.095, 0.47, 0.008], [s * 0.1, 0.16, -0.01], 0.05, 0.034, 5, true);
+      fibers(m, [s * 0.2, 1.4, -0.008], j.elbow, 0.046, 0.034, 5);
       for (let i = 0; i < 4; i++) {
         const pts = [];
         for (let k = 0; k <= 10; k++) { const t = k / 10; pts.push([s * lerp(0.02, 0.17, t), 1.42 - i * 0.03 - 0.05 * Math.sin(Math.PI * t), 0.125 - 0.04 * t * t]); }
@@ -301,13 +516,13 @@
 
   /* Where each region's marker sits, and where the camera goes to zoom in on it */
   const ANCHOR = {
-    brain: [0, 1.72, 0.03], eyes: [0, 1.648, 0.095], lungs: [-0.078, 1.34, 0.065], heart: [0.03, 1.29, 0.075],
-    blood: [0.27, 1.12, 0.04], gut: [0, 1.05, 0.08], kidneys: [0.066, 1.13, -0.08], bones: [-0.105, 0.93, 0.05],
-    muscles: [0.1, 0.7, 0.085], skin: [-0.24, 1.36, 0.045]
+    brain: [0, 1.738, 0.03], eyes: [0, 1.652, 0.094], lungs: [-0.078, 1.34, 0.065], heart: [0.03, 1.29, 0.075],
+    blood: [0.262, 1.12, 0.04], gut: [0, 1.05, 0.08], kidneys: [0.066, 1.13, -0.08], bones: [-0.105, 0.93, 0.05],
+    muscles: [0.1, 0.7, 0.085], skin: [-0.209, 1.36, 0.048]
   };
   const FOCUS = {
-    brain: { t: [0, 1.69, 0], d: 0.62, yaw: 0.45, pitch: 0.12 },
-    eyes: { t: [0, 1.65, 0.05], d: 0.5, yaw: 0, pitch: 0.04 },
+    brain: { t: [0, 1.7, -0.005], d: 0.62, yaw: 0.45, pitch: 0.12 },
+    eyes: { t: [0, 1.652, 0.05], d: 0.48, yaw: 0.2, pitch: 0.04 },
     lungs: { t: [0, 1.32, 0], d: 0.95, yaw: 0.3, pitch: 0.06 },
     heart: { t: [0.03, 1.29, 0.03], d: 0.62, yaw: -0.35, pitch: 0.05 },
     blood: { t: [0.1, 1.12, 0], d: 1.55, yaw: 0.25, pitch: 0.06 },
@@ -442,6 +657,50 @@
       }
     }
 
+    // Skin: rim lighting (lines glow where the surface turns away from the viewer, like a
+    // real hologram), faint back faces and a translucent volume from stacked ring fills
+    const SHADES = 7;
+    function drawSurface(mesh, color, alpha, width) {
+      const vs = mesh.verts, ns = mesh.norms, P = mesh.P, SH = mesh.SH;
+      for (let i = 0, v = 0; i < vs.length; i += 3, v++) {
+        project(vs[i], vs[i + 1], vs[i + 2], P, i);
+        const nx = ns[i], ny = ns[i + 1], nz = ns[i + 2];
+        const nzv = ny * sp + (-nx * syw + nz * cyw) * cp; // normal towards the camera
+        const rim = 1 - Math.abs(nzv);
+        SH[v] = nzv >= 0 ? 0.16 + 0.84 * rim * rim * rim : 0.05 + 0.3 * rim;
+      }
+      // Volume
+      const fl = mesh.fills;
+      if (fl.length) {
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.02 * alpha;
+        for (let k = 0; k < fl.length; k += 2) {
+          const b = fl[k] * 3, c = fl[k + 1];
+          if (P[b] !== P[b]) continue;
+          ctx.beginPath();
+          ctx.moveTo(P[b], P[b + 1]);
+          for (let q = 1; q < c; q++) { const o = b + q * 3; if (P[o] === P[o]) ctx.lineTo(P[o], P[o + 1]); }
+          ctx.fill();
+        }
+      }
+      // Lines, grouped by brightness
+      const paths = [];
+      for (let q = 0; q < SHADES; q++) paths.push(new Path2D());
+      const sg = mesh.segs;
+      for (let s = 0; s < sg.length; s += 2) {
+        const a = sg[s], b = sg[s + 1], a3 = a * 3, b3 = b * 3;
+        if (P[a3] !== P[a3] || P[b3] !== P[b3]) continue;
+        const p = paths[Math.min(SHADES - 1, (((SH[a] + SH[b]) / 2) * SHADES) | 0)];
+        p.moveTo(P[a3], P[a3 + 1]);
+        p.lineTo(P[b3], P[b3 + 1]);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width * 3.2;
+      for (let q = 1; q < SHADES; q++) { ctx.globalAlpha = ((q + 0.5) / SHADES) * alpha * 0.12; ctx.stroke(paths[q]); }
+      ctx.lineWidth = width;
+      for (let q = 0; q < SHADES; q++) { ctx.globalAlpha = ((q + 0.5) / SHADES) * alpha; ctx.stroke(paths[q]); }
+    }
+
     const tmp = new Float32Array(3);
     function ellipseAt(y, rx, rz, n, color, alpha, width, rot) {
       const p = new Path2D();
@@ -515,7 +774,9 @@
 
       // Skin and body outline
       const skinFocus = focused === 'skin';
-      drawMesh(body, skinFocus ? colorOf('skin') : C.accent, focused ? (skinFocus ? 1 : 0.4) : 0.85, skinFocus ? 1.25 : 1, null, 1);
+      const skinCol = skinFocus ? colorOf('skin') : C.accent, skinA = focused ? (skinFocus ? 1.1 : 0.6) : 1;
+      drawSurface(body, skinCol, skinA, skinFocus ? 1.15 : 0.9);
+      drawMesh(body.details, skinCol, Math.min(1, skinA * 0.95), 1.1, null, 1);
 
       // Scanning plane
       if (!reduce.matches) {

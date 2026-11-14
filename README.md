@@ -93,7 +93,7 @@ To use your own Supabase project: run `supabase/schema.sql` in its SQL editor, t
 
 - Plain HTML, CSS and JavaScript with **no libraries or build step**: it works offline.
 - Custom `<canvas>` charts and SVG icons.
-- A **3D hologram of the human body** drawn by a small software 3D engine on `<canvas>`, with no WebGL library. It uses perspective projection, an orbit camera that flies to each organ, depth-faded glowing wireframes, a heartbeat and blood flow. It respects the "reduce motion" setting.
+- A **3D hologram of the human body** drawn by a small software 3D engine on `<canvas>`, with no WebGL library. The figure is anatomical and built procedurally: face, ears, chest, shoulder blades, glutes, muscle shapes, hands with fingers and feet. It uses rim lighting, a translucent volume, an orbit camera that flies to each organ, a heartbeat and blood flow. It respects the "reduce motion" setting.
 - Local persistence with `localStorage`.
 - **Supabase** (Postgres, anonymous Auth and Row Level Security) for the reports to Earth, used through its REST API with plain `fetch`, with no SDK.
 - Hosted as a static site on **Render** and **GitHub Pages**. Both deploy automatically from the `main` branch.
