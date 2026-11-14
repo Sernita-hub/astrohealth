@@ -1,0 +1,144 @@
+# AstroHealth
+
+**NASA Space Apps Challenge 2026 · Challenge: *Create Health Monitoring Software for Astronauts on Space Missions***
+
+**▶ Live app: [sernita-hub.github.io/astrohealth](https://sernita-hub.github.io/astrohealth/)** · Source code: [github.com/Sernita-hub/astrohealth](https://github.com/Sernita-hub/astrohealth)
+
+AstroHealth is a visual health self-assessment tool for astronauts on long-duration missions. Crew members log their health indicators, instantly see what each value means in the space environment, and know what to do next: act on their own, alert the Crew Medical Officer, or send a report to the flight surgeon on Earth.
+
+It is built to work offline, as it would aboard a spacecraft: no installation, no server and no internet connection required. The interface is available in **English and Spanish**: use the **EN / ES** switch in the top bar (English is the default, and each browser remembers its choice).
+
+---
+
+## How to run it
+
+1. Open the **[live app](https://sernita-hub.github.io/astrohealth/)**, or download this repository and open `index.html` in a modern browser (Chrome, Edge, Firefox or Safari).
+2. On first launch it opens with a **demo mission**: 30 days of simulated data from a transit to Mars. From the welcome card you can choose **Set up my own mission** to start from scratch.
+
+Optionally, with a local server:
+
+```bash
+python -m http.server 5173
+```
+
+then open `http://localhost:5173`.
+
+Data is stored only in the browser (`localStorage`). From **Settings** you can export it as JSON (copy), import it from a `.json` file, reload the demo or delete everything.
+
+---
+
+## How it addresses the challenge
+
+| What the challenge asks for | How AstroHealth delivers it |
+|---|---|
+| A visual tool for astronauts to assess their own health | **Dashboard** with an AstroHealth score (0–100) and 12 color-coded indicator cards with 7-day sparklines |
+| Collect health indicators through different inputs (keyboard, clicks, camera…) | Keyboard (numeric values), clicks (mood and stress pickers, symptom checklist) and **tap-to-measure pulse**: the astronaut taps the screen on every heartbeat and AstroHealth calculates the heart rate |
+| Guidance on treatments and health improvements | Every out-of-range value shows **specific actions**, depending on whether it is high or low and whether it needs watching or is critical |
+| When does a result need attention from the crew or flight surgeons? | Three levels, **Normal / Watch / Critical**, with clear escalation criteria and a **Report to Earth** button |
+| A human figure with clickable body parts | **Body map** with 10 regions (brain, eyes, lungs, heart, blood and immunity, digestion, kidneys, bones, muscles, skin and radiation): what each does, how space affects it, current data and what to do |
+| Different environments (spacecraft, station, rover, base) | 5 environments with their own gravity, typical radiation, exercise goal and real **communication delay** (from real time on the ISS to ~12 min from Mars) |
+| Prompt measurements as part of the mission routine | **Daily routine** with scheduled times and **reminders** when a task is overdue |
+| Gamification | XP, levels and ranks, streaks, "perfect days" and 11 badges |
+| Dynamic charts | **Trends** over 7, 14 or 30 days with normal / watch / critical color bands, statistics and trend direction |
+| Don't assume astronauts know how to assess their health | Every field has **How to measure** and **Why it matters in space**; the **Guide** explains the 5 hazards of human spaceflight |
+
+### Indicators
+
+Heart rate, blood pressure, oxygen saturation, body temperature, blood glucose, sleep, mood, stress, daily radiation dose, exercise, hydration, body mass, and 12 symptoms (headache, blurred vision as a possible sign of SANS, nausea, shortness of breath, chest pain, flank pain as a possible kidney stone, and more).
+
+It also calculates two derived indicators:
+
+- **Cumulative mission radiation** against NASA's career dose limit (600 mSv).
+- **Estimated bone loss**, using a simplified model (~1–1.5% per month in microgravity, reduced by exercise).
+
+It detects **multi-day trends** as well: accumulated sleep debt, persistently low mood and exercise below the weekly goal.
+
+### Report to Earth
+
+AstroHealth generates a text report for the flight surgeon (indicators, symptoms, alerts, exposure and notes) that can be copied. The **simulated transmission** shows the real round-trip delay for the current environment and a simulated reply from the flight surgeon. It illustrates why, far from Earth, crews need to be able to assess themselves and act on their own.
+
+---
+
+## Resources used
+
+**NASA (Human Research Program)**
+- [5 Hazards of Human Spaceflight](https://www.nasa.gov/hrp/hazards/): basis for the "5 hazards" section (radiation, isolation and confinement, distance from Earth, gravity fields, hostile and closed environments).
+- [Risks of Human Spaceflight](https://www.nasa.gov/hrp/risks/)
+- [Ongoing HRP Research in Space](https://www.nasa.gov/hrp/ongoing-hrp-research/)
+
+**Canadian Space Agency (CSA)**
+- [Monitoring Radiation for Astronaut Health](https://www.asc-csa.gc.ca/eng/news/articles/2026/2026-02-26-monitoring-radiation-astronaut-health.asp)
+- [Why Do We Conduct Science Experiments in Space?](https://www.asc-csa.gc.ca/eng/iss/science/why-do-we-conduct-science-experiments-in-space.asp)
+
+> ⚠️ Team note: before submitting, review the reference ranges and figures in `js/data.js` (dose per environment, limits for each indicator, bone loss rates) against these sources. They are educational approximations.
+
+---
+
+## Technology
+
+- Plain HTML, CSS and JavaScript with **no libraries or external dependencies**: it works offline.
+- Custom `<canvas>` charts, SVG human figure and icons.
+- Local persistence with `localStorage`.
+- Responsive layout for desktop, tablet and phone. Keyboard accessible.
+
+```
+index.html        App structure
+css/styles.css    Styles (dark mission-control theme)
+js/data.js        Indicators, ranges, environments, hazards, body regions, routine and badges (English content)
+js/logic.js       Assessment, alerts, trends, gamification, demo data and report
+js/i18n.js        Spanish content pack and the EN/ES language switch
+js/charts.js      Line charts and sparklines
+js/icons.js       SVG icons and logo
+js/app.js         User interface and views
+```
+
+To adjust a range or a recommendation, or to add an indicator, edit `js/data.js` (and its Spanish text in `js/i18n.js`). Interface strings are written in `js/app.js` as `tx('English', 'Español')` pairs.
+
+---
+
+## Limitations and next steps
+
+- Ranges and models are **approximate**. AstroHealth is not a medical device.
+- Pulse measurement with the **camera** (fingertip photoplethysmography).
+- Integration with real sensors (oximeter, blood pressure cuff, actigraph) over Bluetooth.
+- A Crew Medical Officer view showing the status of the whole crew.
+- Light theme and more languages.
+
+---
+
+## Use of Super Intelligence (SI)
+
+*Super Intelligence (SI) is the term NASA Space Apps 2026 uses for what is commonly called AI.*
+
+AstroHealth was built with one SI tool: **Claude (Anthropic)**, an AI assistant used through Claude Code.
+
+**What the team did**
+
+- Chose the challenge and the approach: a self-assessment app that works offline, in plain HTML, CSS and JavaScript.
+- Named the product **AstroHealth**, kept the logo and set the language requirements: English for the judges, with a Spanish option.
+- Directed the work by asking for each change.
+
+**What was generated with SI**
+
+| Part of the project | What the SI tool did |
+|---|---|
+| Code | Wrote the HTML, CSS and JavaScript in this repository, including the canvas charts, the SVG icons, the logo and the SVG body map. |
+| Data | Wrote the reference ranges and recommendations in `js/data.js` as educational approximations, and the 30-day **simulated** demo mission. No real astronaut data is used. |
+| Text | Wrote the interface text, the health guidance, the Spanish translation and this README. |
+| Design | Proposed the feature set and the screen layout, following the requirements listed in the challenge description. |
+
+**Not generated with SI:** the project contains no SI-generated images, video or audio, and it uses no NASA logos, flags or other NASA branding.
+
+**How SI content is marked:** every source file (`index.html`, `css/styles.css` and `js/*.js`) starts with an SI notice, and `index.html` also declares it in a `generator` meta tag.
+
+## Team
+
+- Laura Sofia Orozco Acevedo
+- Hannah Isabella Nieto Pérez
+- Samuel Serna Monsalve
+- Isabella Torres Calderon
+- Jose Daniel Barbosa Orozco
+
+---
+
+*AstroHealth is an educational prototype. It does not replace evaluation by a flight surgeon or a health professional.*

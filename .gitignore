@@ -1,0 +1,10 @@
+# Local editor and assistant settings
+.claude/
+
+# Team-only draft of the Space Apps submission form
+SUBMISSION-DRAFT.md
+
+# OS files
+Thumbs.db
+desktop.ini
+.DS_Store

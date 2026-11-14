@@ -1,0 +1,78 @@
+<!doctype html>
+<!-- SI notice: AstroHealth was generated with Claude (Anthropic), a Super Intelligence (SI) tool.
+     See README, "Use of Super Intelligence (SI)". -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AstroHealth</title>
+  <meta name="description" content="AstroHealth: a visual health self-assessment tool for astronauts on long-duration space missions, in English and Spanish. NASA Space Apps Challenge 2026.">
+  <meta name="generator" content="Claude (Anthropic), Super Intelligence (SI) tool. See README.">
+  <meta name="theme-color" content="#060a13">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='21' fill='%23060a13' stroke='%234cc9f0' stroke-width='3'/%3E%3Cpath d='M8 26h8l3-8 5 15 4-11 2 4h10' fill='none' stroke='%23e8eef8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main" data-es="Saltar al contenido">Skip to content</a>
+  <div class="app">
+    <aside class="sidebar" aria-label="Main navigation" data-es-label="Navegación principal">
+      <div class="brand">
+        <span id="brand-logo"></span>
+        <div>
+          <strong>AstroHealth</strong>
+          <span data-es="Monitor de salud de la tripulación">Crew health monitor</span>
+        </div>
+      </div>
+      <nav class="nav" id="nav">
+        <button type="button" data-view="dashboard"><span class="nav-ic" data-icon="grid"></span><span class="label" data-es="Panel">Dashboard</span></button>
+        <button type="button" data-view="body"><span class="nav-ic" data-icon="body"></span><span class="label" data-es="Cuerpo">Body</span></button>
+        <button type="button" data-view="log"><span class="nav-ic" data-icon="plus"></span><span class="label" data-es="Registrar">Log</span></button>
+        <button type="button" data-view="trends"><span class="nav-ic" data-icon="chart"></span><span class="label" data-es="Tendencias">Trends</span></button>
+        <button type="button" data-view="routine"><span class="nav-ic" data-icon="trophy"></span><span class="label" data-es="Rutina">Routine</span></button>
+        <button type="button" data-view="guide"><span class="nav-ic" data-icon="book"></span><span class="label" data-es="Guía">Guide</span></button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="xp-mini" id="xp-mini"></div>
+        <p>NASA Space Apps Challenge 2026<br><span data-es="Herramienta educativa: no sustituye la evaluación médica.">Educational tool: not a substitute for medical evaluation.</span></p>
+      </div>
+    </aside>
+
+    <main class="main" id="main" tabindex="-1">
+      <header class="topbar">
+        <div class="mission-info" id="mission-info"></div>
+        <div class="topbar-actions">
+          <div class="lang-switch" role="group" aria-label="Language" data-es-label="Idioma">
+            <button type="button" data-lang="en" aria-pressed="true" lang="en" title="English">EN</button>
+            <button type="button" data-lang="es" aria-pressed="false" lang="es" title="Español">ES</button>
+          </div>
+          <button type="button" class="btn btn-primary" data-action="report"><span data-icon="send"></span><span data-es="Reporte a Tierra">Report to Earth</span></button>
+          <button type="button" class="icon-btn" data-action="settings" aria-label="Mission settings" data-es-label="Ajustes de misión" title="Mission settings"><span data-icon="sliders"></span></button>
+        </div>
+      </header>
+
+      <div class="reminder" id="reminder" role="status" hidden></div>
+
+      <section class="view" id="view-dashboard" aria-label="Dashboard" data-es-label="Panel"></section>
+      <section class="view" id="view-body" aria-label="Body map" data-es-label="Mapa del cuerpo" hidden></section>
+      <section class="view" id="view-log" aria-label="Log measurements" data-es-label="Registrar mediciones" hidden></section>
+      <section class="view" id="view-trends" aria-label="Trends" data-es-label="Tendencias" hidden></section>
+      <section class="view" id="view-routine" aria-label="Routine and achievements" data-es-label="Rutina y logros" hidden></section>
+      <section class="view" id="view-guide" aria-label="Guide" data-es-label="Guía" hidden></section>
+    </main>
+  </div>
+
+  <div id="modal-root" hidden></div>
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+  <input type="file" id="import-file" accept="application/json,.json" hidden>
+
+  <noscript><p class="noscript">AstroHealth needs JavaScript to run. / AstroHealth necesita JavaScript para funcionar.</p></noscript>
+
+  <script src="js/data.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/logic.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
