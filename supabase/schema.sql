@@ -66,3 +66,13 @@ drop trigger if exists reports_limit on public.reports;
 create trigger reports_limit
   before insert on public.reports
   for each row execute function public.reports_limit();
+
+-- Projects created with "Enable automatic RLS" get this helper function.
+-- App users never need to call it (Supabase Security Advisor recommendation).
+do $$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+  end if;
+end;
+$$;
