@@ -71,6 +71,7 @@ The **Mission Control** view lists the reports received on Earth (date, astronau
 - **Limits.** Field lengths and values are checked by the database, and each device can store up to 200 reports.
 - **The key in `js/cloud.js` is public by design.** It is Supabase's *publishable* key: it only allows what the database rules above permit.
 - **Demo data only.** AstroHealth is a prototype, not a medical system. Use fictional or demo data.
+- **Always on.** Free Supabase projects are paused after about a week without activity. A scheduled GitHub Action ([`.github/workflows/keep-supabase-active.yml`](.github/workflows/keep-supabase-active.yml)) runs a tiny query three times a week, `public.keep_alive()`, which only returns the server time, so the database stays active. If the query ever fails, the workflow run fails and GitHub notifies the repository owner. The app itself is a static site on Render and GitHub Pages, which do not sleep. Note: GitHub turns off scheduled workflows in public repositories after 60 days without commits; turn it back on from the **Actions** tab if that happens.
 
 To use your own Supabase project: run `supabase/schema.sql` in its SQL editor, turn on **Authentication → Sign In / Providers → Allow anonymous sign-ins**, and put the project URL and publishable key in `js/cloud.js`. With an empty URL or key, the app runs fully offline and the link is simulated.
 

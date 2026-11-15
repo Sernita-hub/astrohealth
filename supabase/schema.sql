@@ -76,3 +76,18 @@ begin
   end if;
 end;
 $$;
+
+-- Keep-alive: free Supabase projects are paused after about a week without activity.
+-- A scheduled GitHub Action (.github/workflows/keep-supabase-active.yml) calls this
+-- function twice a week, which runs a real query and keeps the database awake.
+-- It reads no table and returns only the server time.
+create or replace function public.keep_alive()
+returns timestamptz
+language sql
+stable
+security invoker
+set search_path = ''
+as $$ select now() $$;
+
+revoke all on function public.keep_alive() from public;
+grant execute on function public.keep_alive() to anon, authenticated;

@@ -1,0 +1,36 @@
+# AstroHealth · Keep the Supabase database active
+# Free Supabase projects are paused after about a week without activity. This workflow
+# runs a tiny query (public.keep_alive(), see supabase/schema.sql) three times a week,
+# so the Mission Control database never goes a week without activity.
+# The URL and key are the public ones already in js/cloud.js: a publishable key only
+# allows what the database rules permit (here, reading the server time).
+# SI notice: generated with Claude (Anthropic), a Super Intelligence (SI) tool. See README.
+name: Keep Supabase active
+
+on:
+  schedule:
+    - cron: '17 9 * * 1,3,5'   # Mondays, Wednesdays and Fridays at 09:17 UTC
+  workflow_dispatch:            # "Run workflow" button, for a manual check
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: https://ugodypkcqoehzxfodobc.supabase.co
+      SUPABASE_KEY: sb_publishable_K1gHZ62RgUzLGvvsTTt_Jg_gotpbWR-
+    steps:
+      - name: Query the database
+        run: |
+          for attempt in 1 2 3; do
+            code=$(curl -s -o response.txt -w '%{http_code}' -X POST "$SUPABASE_URL/rest/v1/rpc/keep_alive" \
+              -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" -d '{}')
+            echo "Attempt $attempt: HTTP $code $(cat response.txt)"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 30
+          done
+          echo "::error::Supabase did not answer. Open the project in the Supabase dashboard: it may be paused."
+          exit 1
