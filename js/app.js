@@ -1692,6 +1692,12 @@
       window.addEventListener('online', () => flushOutbox().then(afterFlush));
       if (state.outbox.length) setTimeout(() => flushOutbox().then(afterFlush), 2500);
     }
+
+    // Offline copy of the app (sw.js): after the first visit the link opens with no connection.
+    // Browsers only allow it over https or on localhost, so a copy opened from a file skips it.
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+      window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+    }
   }
 
   init();

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- AstroHealth app icon: the app's logo (an orbit around a pulse line) on the dark mission background.
+       SI notice: drawn as code with Claude (Anthropic), a Super Intelligence (SI) tool. See README. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4cc9f0"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" fill="#060a13"/>
+  <g transform="translate(24 24) scale(0.68) translate(-24 -24)">
+    <circle cx="24" cy="24" r="21" fill="none" stroke="url(#g)" stroke-width="2.5" opacity=".9"/>
+    <ellipse cx="24" cy="24" rx="21" ry="8" fill="none" stroke="url(#g)" stroke-width="1.5" opacity=".55" transform="rotate(-25 24 24)"/>
+    <path d="M8 26h8l3-8 5 15 4-11 2 4h10" fill="none" stroke="#e8eef8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
