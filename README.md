@@ -8,14 +8,15 @@ No account or sign-up needed: open the link and the demo mission loads.
 
 AstroHealth is a visual health self-assessment tool for astronauts on long-duration missions. Crew members log their health indicators, instantly see what each value means in the space environment, and know what to do next: act on their own, alert the Crew Medical Officer, or send a report to the flight surgeon on Earth.
 
-It is built to work offline, as it would aboard a spacecraft: no installation and no account needed. After the first visit, the live link opens even with no connection, because a service worker keeps a copy of the app in the browser. When there is a connection, every report to Earth is stored in a cloud database (**Supabase**) that plays the role of Mission Control. Without one, reports wait in an outbox and leave automatically when the link comes back (store-and-forward). The interface is available in **English and Spanish**: use the **EN / ES** switch in the top bar (English is the default, and each browser remembers its choice).
+It is built to work offline, as it would aboard a spacecraft: no installation and no account needed. It is a **Progressive Web App (PWA)**: it can be installed like any other app on a phone, tablet or computer, and after the first visit it opens even with no connection, because a service worker keeps a copy of the app on the device. When there is a connection, every report to Earth is stored in a cloud database (**Supabase**) that plays the role of Mission Control. Without one, reports wait in an outbox and leave automatically when the link comes back (store-and-forward). The interface is available in **English and Spanish**: use the **EN / ES** switch in the top bar (English is the default, and each browser remembers its choice).
 
 ---
 
 ## How to run it
 
 1. Open the **[live app](https://astrohealth-wtfb.onrender.com/)**, or download this repository and open `index.html` in a modern browser (Chrome, Edge, Firefox or Safari).
-   - **To try it offline:** open the live app once with a connection, then turn on airplane mode and reload. The app opens from its saved copy. Browsers that support it can also install it as an app.
+   - **To install it as an app:** choose **Install** on the bar that appears at the top (Chrome, Edge and other Chromium browsers on Android, Windows, macOS and Linux), or go to **Mission settings → App**. On iPhone or iPad: in Safari, tap **Share → Add to Home Screen**. No app store is needed.
+   - **To try it offline:** open the live app once with a connection, then turn on airplane mode and reload (or open the installed app). The app opens from its saved copy.
 2. On first launch it opens with a **demo mission**: 30 days of simulated data from a transit to Mars. From the welcome card you can choose **Set up my own mission** to start from scratch.
 
 Optionally, with a local server:
@@ -115,7 +116,8 @@ Every number in `js/data.js` was checked against the source below. Where there i
 ## Technology
 
 - Plain HTML, CSS and JavaScript with **no libraries or build step**: it works offline.
-- **Offline copy** with a service worker (`sw.js`) and a web app manifest. It works network first: when there is a connection, the newest version is used and saved; with no connection, or a link slower than 4 seconds, the saved copy is used. Reports to Supabase are never cached: they wait in the app's outbox instead.
+- **Installable app (PWA)**: a web app manifest (name, icon, colors and shortcuts to Log, Body and Mission Control) and an in-app **Install** bar that uses the browser's own install dialog.
+- **Offline copy** with a service worker (`sw.js`). It works network first: when there is a connection, the newest version is used and saved; with no connection, or a link slower than 4 seconds, the saved copy is used. Reports to Supabase are never cached: they wait in the app's outbox instead.
 - Custom `<canvas>` charts and SVG icons.
 - A **3D hologram of the human body** drawn by a small software 3D engine on `<canvas>`, with no WebGL library. The figure is anatomical and built procedurally: face, ears, chest, shoulder blades, glutes, muscle shapes, hands with fingers and feet. It uses rim lighting, a translucent volume, an orbit camera that flies to each organ, a heartbeat and blood flow. It respects the "reduce motion" setting.
 - Local persistence with `localStorage`.

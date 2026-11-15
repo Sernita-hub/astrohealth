@@ -1,4 +1,5 @@
 {
+  "id": "./",
   "name": "AstroHealth",
   "short_name": "AstroHealth",
   "description": "Health self-assessment for astronauts on long-duration missions. Works offline. NASA Space Apps Challenge 2026 prototype, built with an SI tool (see README).",
@@ -8,8 +9,14 @@
   "background_color": "#060a13",
   "theme_color": "#060a13",
   "lang": "en",
+  "categories": ["health", "medical", "education"],
   "icons": [
     { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Log measurements", "short_name": "Log", "url": "./#log", "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Body map", "short_name": "Body", "url": "./#body", "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }] },
+    { "name": "Mission Control", "short_name": "Control", "url": "./#control", "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }] }
   ]
 }

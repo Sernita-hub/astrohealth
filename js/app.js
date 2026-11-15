@@ -118,6 +118,7 @@
     refresh();
     applyStatic();
     renderAll();
+    renderInstallBar();
     toast(tx('Language: English', 'Idioma: español'), 'info', 'globe');
   }
 
@@ -157,6 +158,66 @@
         <span>${over.length > 1 ? tx(`You have ${over.length} pending tasks in today's routine.`, `Tienes ${over.length} tareas pendientes en tu rutina de hoy.`) : esc(t.detail)}</span></div>
       <button type="button" class="btn btn-sm btn-primary" data-action="${isBreath ? 'goto-breath' : 'goto-log'}" data-task="${t.id}">${isBreath ? tx('Do it now', 'Hacer ahora') : tx('Log now', 'Registrar ahora')}</button>
       <button type="button" class="btn btn-sm btn-ghost" data-action="snooze">${tx('Later', 'Más tarde')}</button>`;
+  }
+
+  /* ============================================== Install as an app (PWA) */
+  // The browser offers installation once the app meets its rules (manifest + service worker).
+  // AstroHealth saves that offer and shows its own bar, so the user installs it with one click.
+  const INSTALL_KEY = 'astrohealth.install.v1';
+  let installPrompt = null;
+  const isInstalled = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  // 'installed' | 'prompt' (the browser can install it now) | 'ios' (Safari: Share > Add to Home Screen)
+  // | 'file' (opened from a file) | null (this browser cannot install apps)
+  function installMode() {
+    if (isInstalled()) return 'installed';
+    if (!/^https?:$/.test(location.protocol)) return 'file';
+    if (installPrompt) return 'prompt';
+    if (isIOS()) return 'ios';
+    return null;
+  }
+  function installDismissed() { try { return localStorage.getItem(INSTALL_KEY) === 'later'; } catch (e) { return false; } }
+
+  function renderInstallBar() {
+    const el = $('#install-bar');
+    const mode = installMode();
+    if (!el) return;
+    if ((mode !== 'prompt' && mode !== 'ios') || installDismissed()) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = `
+      <span class="reminder-ic">${ic('download')}</span>
+      <div class="reminder-text"><strong>${tx('Install AstroHealth as an app', 'Instala AstroHealth como app')}</strong>
+        <span>${tx('Open it from your home screen or desktop, even with no connection.', 'Ábrela desde tu pantalla de inicio o escritorio, incluso sin conexión.')}</span></div>
+      <button type="button" class="btn btn-sm btn-primary" data-action="install">${tx('Install', 'Instalar')}</button>
+      <button type="button" class="btn btn-sm btn-ghost" data-action="install-later">${tx('Not now', 'Ahora no')}</button>`;
+  }
+
+  function installText() {
+    const mode = installMode();
+    if (mode === 'installed') return tx('AstroHealth is running as an installed app. It works with or without a connection.', 'AstroHealth está funcionando como app instalada. Funciona con o sin conexión.');
+    if (mode === 'file') return tx('This copy was opened from a file: it works offline, but installing it as an app needs the online link.', 'Esta copia se abrió desde un archivo: funciona sin conexión, pero para instalarla como app hace falta el enlace en línea.');
+    if (mode === 'prompt' || mode === 'ios') return tx('Install AstroHealth to open it from your home screen or desktop like any other app. After the first visit it also works with no connection.', 'Instala AstroHealth para abrirla desde tu pantalla de inicio o escritorio como cualquier otra app. Después de la primera visita también funciona sin conexión.');
+    return tx('This browser keeps an offline copy of AstroHealth. To install it as an app, use its menu (Install app, or Add to Home Screen) or open the link in Chrome, Edge or Safari.', 'Este navegador guarda una copia de AstroHealth para usarla sin conexión. Para instalarla como app, usa su menú («Instalar app» o «Añadir a pantalla de inicio») o abre el enlace en Chrome, Edge o Safari.');
+  }
+
+  async function installApp() {
+    if (installMode() === 'ios') {
+      openModal(`
+        <div class="modal-head"><h2>${ic('download')} ${tx('Install on iPhone or iPad', 'Instalar en iPhone o iPad')}</h2><button type="button" class="icon-btn" data-close-btn aria-label="${tx('Close', 'Cerrar')}">${ic('x')}</button></div>
+        <ol class="install-steps">
+          <li>${tx('Tap the Share button in Safari.', 'Toca el botón Compartir de Safari.')}</li>
+          <li>${tx('Choose “Add to Home Screen”.', 'Elige «Añadir a pantalla de inicio».')}</li>
+          <li>${tx('Tap “Add”. AstroHealth opens from its icon, even with no connection.', 'Toca «Añadir». AstroHealth se abre desde su ícono, incluso sin conexión.')}</li>
+        </ol>
+        <div class="btn-row end"><button type="button" class="btn btn-primary" data-close-btn>${tx('Got it', 'Entendido')}</button></div>`, { label: tx('Install the app', 'Instalar la app') });
+      return;
+    }
+    if (!installPrompt) return;
+    closeModal(true);
+    const offer = installPrompt;
+    installPrompt = null; // the browser's offer can be used only once
+    try { await offer.prompt(); await offer.userChoice; } catch (e) { /* ignore */ }
+    renderInstallBar();
   }
 
   /* ============================================================= Dashboard */
@@ -1162,7 +1223,11 @@
         <button type="button" class="btn" data-action="export">${ic('download')} ${tx('Export JSON', 'Exportar JSON')}</button>
         <button type="button" class="btn" data-action="import">${ic('upload')} ${tx('Import JSON', 'Importar JSON')}</button>
         <button type="button" class="btn btn-crit-ghost" data-action="wipe">${ic('trash')} ${tx('Delete everything', 'Borrar todo')}</button>
-      </div>`}`, { label: tx('Mission settings', 'Ajustes de misión'), onClose: welcome ? (silent) => { if (!silent) ensureProfile(); } : null });
+      </div>
+      <hr>
+      <h3>${tx('App', 'App')}</h3>
+      <p class="small muted">${installText()}</p>
+      ${installMode() === 'prompt' || installMode() === 'ios' ? `<div class="btn-row"><button type="button" class="btn" data-action="install">${ic('download')} ${tx('Install app', 'Instalar app')}</button></div>` : ''}`}`, { label: tx('Mission settings', 'Ajustes de misión'), onClose: welcome ? (silent) => { if (!silent) ensureProfile(); } : null });
   }
 
   function saveSettings(form) {
@@ -1556,6 +1621,12 @@
     switch (a) {
       case 'report': openReport(); break;
       case 'settings': openSettings(false); break;
+      case 'install': installApp(); break;
+      case 'install-later':
+        try { localStorage.setItem(INSTALL_KEY, 'later'); } catch (e) { /* ignore */ }
+        renderInstallBar();
+        toast(tx('You can install it later from Mission settings', 'Puedes instalarla después desde Ajustes de misión'), 'info', 'sliders');
+        break;
       case 'goto-log':
         if (el.dataset.taskWeekly) { closeModal(true); setView('log'); setTimeout(() => focusField(el.dataset.taskWeekly), 80); }
         else goLog(el.dataset.task, el.dataset.regionLog);
@@ -1698,6 +1769,19 @@
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
       window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
     }
+
+    // Install as an app: keep the browser's offer and show AstroHealth's own install bar
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      installPrompt = e;
+      renderInstallBar();
+    });
+    window.addEventListener('appinstalled', () => {
+      installPrompt = null;
+      renderInstallBar();
+      toast(tx('AstroHealth is installed as an app', 'AstroHealth quedó instalada como app'), 'info', 'check');
+    });
+    renderInstallBar();
   }
 
   init();

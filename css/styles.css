@@ -198,6 +198,10 @@ button { cursor: pointer; }
 .reminder-text { flex: 1; min-width: 200px; }
 .reminder-text strong { display: block; }
 .reminder-text span { font-size: 13px; color: var(--muted); }
+/* Install as an app (PWA) */
+.install-bar { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface)); }
+.install-bar .reminder-ic { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.install-steps { margin: 4px 0 14px; padding-left: 22px; display: grid; gap: 8px; }
 
 /* Welcome card (demo mission) */
 .intro {
