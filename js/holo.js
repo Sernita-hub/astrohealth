@@ -235,7 +235,7 @@
     [1.47, 0.176, 0.068, 0.076, -0.008, 0, 0, 0.004, 0.004],
     [1.495, 0.14, 0.06, 0.07, -0.01, 0, 0, 0, 0.002],
     [1.515, 0.095, 0.056, 0.064, -0.012, 0, 0, 0, 0],
-    [1.53, 0.066, 0.054, 0.058, -0.014, 0, 0, 0, 0]
+    [1.53, 0.06, 0.055, 0.057, -0.013, 0, 0, 0, 0]
   ];
   // Head rows: y, half width, front depth, back depth, forward offset, nose, brow, eye sockets
   const HEAD = [
@@ -254,14 +254,15 @@
     [1.78, 0.024, 0.018, 0.036, 0.005, 0, 0, 0],
     [1.785, 0.005, 0.004, 0.006, 0.005, 0, 0, 0]
   ];
-  // Limb profiles: u along the limb (0 = top), lateral, front, back
+  // Limb profiles: u along the limb (0 = top), lateral, front, back.
+  // The arm starts inside the torso with a rounded deltoid cap; at the wrist it matches the hand.
   const ARM = [
-    [0, 0.05, 0.05, 0.05], [0.06, 0.056, 0.05, 0.052], [0.16, 0.05, 0.044, 0.046], [0.3, 0.041, 0.044, 0.042],
-    [0.44, 0.037, 0.036, 0.04], [0.53, 0.035, 0.031, 0.035], [0.6, 0.038, 0.035, 0.034], [0.72, 0.033, 0.03, 0.029],
-    [0.88, 0.028, 0.022, 0.022], [1, 0.026, 0.018, 0.018]
+    [0, 0.03, 0.034, 0.036], [0.05, 0.046, 0.046, 0.048], [0.1, 0.052, 0.05, 0.052], [0.17, 0.053, 0.049, 0.05],
+    [0.25, 0.046, 0.044, 0.045], [0.36, 0.041, 0.044, 0.042], [0.48, 0.037, 0.036, 0.039], [0.565, 0.035, 0.031, 0.035],
+    [0.62, 0.038, 0.035, 0.034], [0.74, 0.033, 0.03, 0.029], [0.88, 0.024, 0.025, 0.024], [1, 0.019, 0.024, 0.024]
   ];
   const LEG = [
-    [0, 0.086, 0.085, 0.09], [0.1, 0.082, 0.083, 0.084], [0.25, 0.072, 0.077, 0.07], [0.4, 0.06, 0.064, 0.058],
+    [0, 0.08, 0.085, 0.09], [0.1, 0.082, 0.083, 0.084], [0.25, 0.072, 0.077, 0.07], [0.4, 0.06, 0.064, 0.058],
     [0.48, 0.05, 0.052, 0.048], [0.52, 0.048, 0.055, 0.046], [0.58, 0.046, 0.044, 0.05], [0.66, 0.047, 0.04, 0.062],
     [0.75, 0.042, 0.036, 0.052], [0.86, 0.034, 0.031, 0.036], [0.95, 0.03, 0.028, 0.03], [1, 0.03, 0.028, 0.03]
   ];
@@ -276,6 +277,11 @@
     shoulder: [s * 0.19, 1.445, -0.008], elbow: [s * 0.252, 1.17, -0.012], wrist: [s * 0.293, 0.93, 0.03],
     hip: [s * 0.09, 0.93, 0], knee: [s * 0.095, 0.5, 0.012], ankle: [s * 0.1, 0.08, -0.012]
   });
+  // Depth of the front of the chest at (x, y), so muscles can sit just under the skin
+  function chestZ(x, y) {
+    const r = rowAt(TORSO, y), q = Math.min(0.999, Math.abs(x) / r[1]);
+    return r[4] + Math.pow(1 - Math.pow(q, 2.5), 0.4) * (r[2] + r[5]);
+  }
 
   function buildBody() {
     const m = new Mesh();
@@ -292,8 +298,14 @@
     }
     loft(m, rings, 2);
 
-    // Neck
-    sweep(m, [[0, 1.48, -0.012], [0, 1.54, -0.014], [0, 1.6, -0.02]], (u) => [0.06 - 0.006 * u, 0.054 - 0.004 * u, 0.058 - 0.004 * u], { n: 20, step: 0.02, mstep: 2 });
+    // Neck: its rings tilt towards the top, so it meets the jaw in front and the skull behind
+    rings = [];
+    for (let k = 0; k <= 10; k++) {
+      const t = k / 10, a = 0.62 * Math.pow(t, 1.6), q = t * t;
+      rings.push(section([0, lerp(1.472, 1.612, t), lerp(-0.012, -0.016, t)], X, [0, -Math.sin(a), Math.cos(a)],
+        lerp(0.06, 0.052, t), lerp(0.054, 0.068, q), lerp(0.058, 0.068, q), 2, null, 20));
+    }
+    loft(m, rings, 2);
 
     // Head: jaw, chin, nose, brow, eye sockets and skull
     rings = [];
@@ -334,12 +346,12 @@
 
     S.forEach((s) => {
       const j = J(s);
-      // Arm: deltoid, biceps and triceps, elbow, forearm, wrist
-      sweep(m, [j.shoulder, j.elbow, j.wrist], (u) => rowAt(ARM, u).slice(1), { n: 18, step: 0.02 });
+      // Arm: deltoid cap (from inside the torso), biceps and triceps, elbow, forearm, wrist
+      sweep(m, [[s * 0.14, 1.452, -0.01], [s * 0.19, 1.418, -0.01], j.elbow, j.wrist], (u) => rowAt(ARM, u).slice(1), { n: 18, step: 0.018 });
 
-      // Hand: palm facing the thigh, four fingers and a thumb
+      // Hand: palm facing the thigh, four fingers and a thumb; it starts inside the wrist
       rings = [];
-      [[0.93, 0, 0.018, 0.024, 0.024], [0.905, 0.002, 0.016, 0.034, 0.03], [0.875, 0.004, 0.015, 0.04, 0.036],
+      [[0.945, 0, 0.019, 0.024, 0.024], [0.905, 0.003, 0.0175, 0.034, 0.03], [0.875, 0.005, 0.016, 0.04, 0.036],
         [0.85, 0.005, 0.013, 0.042, 0.038], [0.838, 0.005, 0.011, 0.04, 0.036]].forEach((r, i, all) => {
         if (i === 0) return;
         const a = all[i - 1];
@@ -351,14 +363,14 @@
       loft(m, rings, 2);
       [[-0.028, 0.058, 0.0075], [-0.009, 0.07, 0.0085], [0.01, 0.076, 0.009], [0.028, 0.07, 0.0085]].forEach(([dz, L, r]) => {
         const z = 0.032 + dz, x0 = s * 0.298;
-        sweep(m, [[x0, 0.842, z], [x0 - s * 0.004, 0.842 - L * 0.5, z + 0.003], [x0 - s * 0.012, 0.842 - L, z + 0.004]],
+        sweep(m, [[x0, 0.852, z], [x0 - s * 0.004, 0.847 - L * 0.5, z + 0.003], [x0 - s * 0.012, 0.842 - L, z + 0.004]],
           (u) => [r * (1 - 0.25 * u), r * (1 - 0.25 * u), r * (1 - 0.25 * u)], { n: 8, step: 0.012, mstep: 4 });
       });
-      sweep(m, [[s * 0.29, 0.905, 0.062], [s * 0.284, 0.875, 0.078], [s * 0.278, 0.85, 0.084]],
+      sweep(m, [[s * 0.291, 0.918, 0.048], [s * 0.285, 0.88, 0.074], [s * 0.278, 0.852, 0.083]],
         (u) => [0.011 * (1 - 0.25 * u), 0.011 * (1 - 0.25 * u), 0.011 * (1 - 0.25 * u)], { n: 8, step: 0.012, mstep: 4 });
 
-      // Leg: thigh with quadriceps, kneecap, calf, ankle
-      sweep(m, [j.hip, j.knee, j.ankle], (u) => rowAt(LEG, u).slice(1), { n: 20, step: 0.022 });
+      // Leg: thigh with quadriceps, kneecap, calf, ankle; it ends inside the foot
+      sweep(m, [j.hip, j.knee, j.ankle, [s * 0.1, 0.045, 0.004]], (u) => rowAt(LEG, Math.min(1, u * 1.04)).slice(1), { n: 20, step: 0.022 });
 
       // Foot: heel, arch and toes, with a flat sole
       rings = [];
@@ -461,36 +473,46 @@
     });
     O.kidneys = m.done();
 
-    // Skeleton: spine, ribs, clavicles, pelvis and long bones
+    // Skeleton: spine, ribs, clavicles, pelvis and long bones, joined at the joints
     m = new Mesh();
+    // Spine from the skull base to the pelvis: neck and lower back curve forward, upper back curves back
+    const spineZ = (y) => -0.052 + 0.013 * Math.cos((TAU * (1.58 - y)) / 0.53);
+    const sternumZ = (y) => (y > 1.33 ? lerp(0.088, 0.066, (y - 1.33) / 0.125) : lerp(0.088, 0.086, (1.33 - y) / 0.095));
     const spine = [];
-    for (let i = 0; i <= 18; i++) { const t = i / 18; spine.push([0, lerp(1.56, 0.97, t), -0.05 + 0.018 * Math.sin(t * TAU * 0.9)]); }
+    for (let i = 0; i <= 18; i++) { const y = lerp(1.62, 0.97, i / 18); spine.push([0, y, spineZ(y)]); }
     m.line(spine, false);
     spine.forEach((p) => m.line(circle(p, [1, 0, 0], [0, 0, 1], 0.014, 0.011, 8), true));
     for (let i = 0; i < 7; i++) {
       const y = 1.42 - i * 0.032, rx = 0.12 + i * 0.008 - (i > 4 ? (i - 4) * 0.012 : 0), rz = 0.085 + i * 0.003;
       S.forEach((s) => {
-        const pts = [];
+        const pts = [[s * 0.013, y + 0.006, spineZ(y)]]; // rib head, on its vertebra
         for (let k = 0; k <= 12; k++) { const a = lerp(0.12, 2.5, k / 12); pts.push([s * Math.sin(a) * rx, y - 0.025 * Math.sin(a / 2), 0.012 - Math.cos(a) * rz]); }
+        if (i < 5) { const ye = pts[pts.length - 1][1] - 0.008; pts.push([s * 0.008, ye, sternumZ(ye)]); } // cartilage to the sternum
         m.line(pts, false);
       });
     }
-    m.line([[0, 1.43, 0.11], [0, 1.24, 0.12]], false);
+    m.line([[0, 1.455, 0.066], [0, 1.33, 0.088], [0, 1.235, 0.086]], false); // sternum
     m.line(circle([0, 0.96, 0], [1, 0, 0], [0, 0, 1], 0.125, 0.075, 22), true);
     m.line(circle([0, 0.9, 0.01], [1, 0, 0], [0, 0, 1], 0.085, 0.055, 18), true);
     S.forEach((s) => {
       const j = J(s);
-      m.line([[s * 0.01, 1.47, 0.06], [s * 0.1, 1.475, 0.035], [s * 0.18, 1.46, -0.005]], false); // clavicle
+      m.line([[s * 0.012, 1.455, 0.064], [s * 0.1, 1.472, 0.035], [s * 0.185, 1.455, -0.008]], false); // clavicle
       m.line([[s * 0.06, 1.42, -0.07], [s * 0.15, 1.43, -0.065], [s * 0.1, 1.3, -0.07], [s * 0.06, 1.42, -0.07]], false); // shoulder blade
+      m.line([[s * 0.15, 1.43, -0.065], [s * 0.18, 1.452, -0.03], [s * 0.185, 1.455, -0.008]], false); // acromion, to the clavicle
       m.line([j.shoulder, j.elbow], false);                                                  // humerus
-      m.line([j.elbow, [s * 0.288, 0.93, 0.022]], false);                                    // ulna
-      m.line([[s * 0.258, 1.165, -0.004], [s * 0.298, 0.93, 0.038]], false);                  // radius
-      [-0.028, -0.009, 0.01, 0.028].forEach((dz) => m.line([[s * 0.296, 0.9, 0.032 + dz * 0.5], [s * 0.298, 0.842, 0.032 + dz], [s * 0.288, 0.78, 0.036 + dz]], false));
+      m.line([j.elbow, [s * 0.288, 0.928, 0.022]], false);                                   // ulna
+      m.line([[s * 0.258, 1.165, -0.004], [s * 0.298, 0.928, 0.038]], false);                 // radius
+      m.line(circle([s * 0.294, 0.916, 0.031], [0, 1, 0], [0, 0, 1], 0.012, 0.02, 10), true);  // wrist bones
+      [-0.028, -0.009, 0.01, 0.028].forEach((dz) => m.line([[s * 0.295, 0.91, 0.031 + dz * 0.4], [s * 0.297, 0.875, 0.032 + dz * 0.8],
+        [s * 0.298, 0.842, 0.032 + dz], [s * 0.288, 0.78, 0.036 + dz]], false));             // hand and finger bones
+      m.line([[s * 0.292, 0.912, 0.044], [s * 0.285, 0.88, 0.072], [s * 0.278, 0.852, 0.082]], false); // thumb
       m.line([[s * 0.085, 0.95, 0], j.knee], false);                                          // femur
-      m.line([j.knee, j.ankle], false);                                                        // tibia
+      m.line([j.knee, j.ankle, [s * 0.1, 0.056, 0]], false);                                   // tibia, down to the ankle bone
       m.line([[s * 0.11, 0.49, 0.0], [s * 0.112, 0.09, -0.02]], false);                        // fibula
       m.line(circle([s * 0.095, 0.5, 0.05], [1, 0, 0], [0, 1, 0], 0.02, 0.022, 10), true);   // kneecap
-      m.line([[s * 0.1, 0.03, -0.04], [s * 0.1, 0.045, 0.02], [s * 0.104, 0.02, 0.15]], false); // foot
+      m.line([[s * 0.094, 0.522, 0.05], [s * 0.093, 0.575, 0.034]], false);                    // quadriceps tendon
+      m.line([[s * 0.095, 0.478, 0.05], [s * 0.096, 0.43, 0.03]], false);                      // kneecap tendon
+      m.line([[s * 0.1, 0.022, -0.042], [s * 0.1, 0.056, 0], [s * 0.102, 0.04, 0.07], [s * 0.104, 0.015, 0.16]], false); // foot
     });
     // Skull outline
     m.line(circle([0, 1.69, -0.005], [0, 1, 0], [0, 0, 1], 0.085, 0.1, 28), true);
@@ -504,9 +526,13 @@
       fibers(m, [s * 0.09, 0.88, 0.004], j.knee, 0.074, 0.047, 7);
       fibers(m, [s * 0.095, 0.47, 0.008], [s * 0.1, 0.16, -0.01], 0.05, 0.034, 5, true);
       fibers(m, [s * 0.2, 1.4, -0.008], j.elbow, 0.046, 0.034, 5);
+      // Pectorals: from the sternum to the upper arm, just under the skin of the chest
       for (let i = 0; i < 4; i++) {
         const pts = [];
-        for (let k = 0; k <= 10; k++) { const t = k / 10; pts.push([s * lerp(0.02, 0.17, t), 1.42 - i * 0.03 - 0.05 * Math.sin(Math.PI * t), 0.125 - 0.04 * t * t]); }
+        for (let k = 0; k <= 10; k++) {
+          const t = k / 10, x = lerp(0.016, 0.175, t), y = lerp(1.435 - i * 0.034, 1.4, t) - 0.012 * Math.sin(Math.PI * t);
+          pts.push([s * x, y, chestZ(x, y) - 0.005]);
+        }
         m.line(pts, false);
       }
     });
