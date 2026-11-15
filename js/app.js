@@ -33,6 +33,7 @@
   let trendSel = 'hr';
   let trendRange = 14;
   let chart = null;
+  let xpChart = null;        // XP growth chart (Routine view)
   let region = 'heart';
   let snoozeUntil = 0;
   let lastResult = null;     // last saved log (to show its assessment)
@@ -74,6 +75,7 @@
   function renderView() {
     stopBreath(false);
     if (chart && view !== 'trends') { chart.destroy(); chart = null; }
+    if (xpChart && view !== 'routine') { xpChart.destroy(); xpChart = null; }
     if (holo && view !== 'body') holo.pause();
     ({ dashboard: renderDashboard, body: renderBody, log: renderLog, trends: renderTrends, routine: renderRoutine, control: renderControl, guide: renderGuide })[view]();
   }
@@ -130,7 +132,7 @@
     const env = A.ctx.env;
     const md = V.missionDay(state);
     $('#mission-info').innerHTML = `
-      <div class="mi-who">${ic('user')}<div><strong>${esc(p.name || tx('Astronaut', 'Astronauta'))}</strong><span>${esc(p.mission || tx('Unnamed mission', 'Misión sin nombre'))}${p.demo ? ' · demo' : ''}</span></div></div>
+      <button type="button" class="mi-who" data-action="crew" title="${tx('Crew: switch or add a crew member', 'Tripulación: cambiar o añadir tripulante')}">${ic('user')}<div><strong>${esc(p.name || tx('Astronaut', 'Astronauta'))}</strong><span>${esc(p.mission || tx('Unnamed mission', 'Misión sin nombre'))}${p.demo ? ' · demo' : ''} · ${tx('Level', 'Nivel')} ${A.progress.level}</span></div></button>
       <div class="mi-chip">${ic('orbit')}<div><span>${tx('Environment', 'Entorno')}</span><strong>${esc(env.short)}</strong></div></div>
       <div class="mi-chip">${ic('rocket')}<div><span>${tx('Mission day', 'Día de misión')}</span><strong>${md || '—'}</strong></div></div>
       <div class="mi-chip">${ic('signal')}<div><span>${tx('Earth delay', 'Retardo con Tierra')}</span><strong>${esc(env.delayLabel)}</strong></div></div>
@@ -989,6 +991,11 @@
           <div class="btn-row center"><button type="button" class="btn btn-primary" data-action="breath-toggle" id="breath-btn">${ic('play')} ${tx('Start', 'Comenzar')}</button></div>
         </div>
       </div>
+      <div class="card">
+        <div class="card-head"><h2 class="card-title">${ic('chart')} ${tx('XP growth', 'Crecimiento de XP')}</h2><span class="muted small">${esc(state.profile ? state.profile.name : '')}</span></div>
+        <div class="chart-wrap"><canvas id="xp-chart" role="img" aria-label="${esc(tx(`Chart of the XP earned, ${pr.xp} XP in total, level ${pr.level}`, `Gráfica de la XP ganada: ${pr.xp} XP en total, nivel ${pr.level}`))}"></canvas><div class="chart-tip" id="xp-tip" hidden></div></div>
+        <p class="small muted">${tx('Total XP day by day. Each dashed line is the XP needed for a new level.', 'XP total día a día. Cada línea punteada es la XP necesaria para un nuevo nivel.')}</p>
+      </div>
       <div class="grid two">
         <div class="card">
           <div class="card-head"><h2 class="card-title">${tx("Today's routine", 'Rutina de hoy')}</h2><span class="muted small">${r.doneCount}/${r.total} ${tx('done', 'completadas')}</span></div>
@@ -1015,6 +1022,33 @@
           <li><b>+5</b> ${tx('for exploring each body region', 'por explorar cada región del cuerpo')}</li>
         </ul>
       </div>`;
+    drawXpChart();
+  }
+
+  // XP growth: cumulative XP per day, with a dashed line at each level threshold
+  function drawXpChart() {
+    if (xpChart) { xpChart.destroy(); xpChart = null; }
+    const canvas = $('#xp-chart');
+    if (!canvas) return;
+    const h = V.xpHistory(state, A.days);
+    const accent = css('--accent'), accent2 = css('--accent-2');
+    const top = h.xp.length ? h.xp[h.xp.length - 1] : 0;
+    const refLines = [];
+    let floor = 0;
+    for (let level = 1; level <= 60; level++) {
+      floor += V.xpForLevel(level);
+      refLines.push({ y: floor, color: accent2, label: `${tx('Level', 'Nivel')} ${level + 1}` });
+      if (floor > top) break; // show the next level to reach, then stop
+    }
+    xpChart = new V.LineChart(canvas, $('#xp-tip'));
+    xpChart.set({
+      labels: h.keys.map(V.fmtShort),
+      fullLabels: h.keys.map((k, i) => `${V.fmtLong(k)} · ${tx('Level', 'Nivel')} ${h.levels[i]}`),
+      unit: 'XP', decimals: 0, clamp: [0, Infinity],
+      hint: [0, refLines.length ? refLines[refLines.length - 1].y : 400],
+      series: [{ name: 'XP', color: accent, values: h.xp }],
+      refLines
+    });
   }
 
   function toggleBreath() {
@@ -1195,14 +1229,20 @@
   }
 
   function openSettings(welcome) {
-    // "New mission" mode starts from scratch (without the demo data)
+    // "New mission" mode starts from scratch (without the demo data); "crew" mode adds a
+    // new crew member to the same mission and keeps the current one saved in the crew list
+    const newMember = welcome === 'crew';
     const blank = { name: '', mission: '', env: 'iss', missionStart: V.dayKey(new Date()), baselineMass: '' };
-    const p = welcome ? Object.assign({}, blank, state.profile && !state.profile.demo ? state.profile : {}) : (state.profile || blank);
-    const replacing = welcome && state.records.length > 0;
+    const cur = state.profile || {};
+    const p = newMember
+      ? Object.assign({}, blank, { mission: cur.mission || '', env: cur.env || 'iss', missionStart: cur.missionStart || blank.missionStart })
+      : welcome ? Object.assign({}, blank, state.profile && !state.profile.demo ? state.profile : {}) : (state.profile || blank);
+    const replacing = welcome === true && state.records.length > 0;
     openModal(`
-      <div class="modal-head"><h2>${ic('sliders')} ${welcome ? tx('Set up your mission', 'Configura tu misión') : tx('Mission settings', 'Ajustes de misión')}</h2><button type="button" class="icon-btn" data-close-btn aria-label="${tx('Close', 'Cerrar')}">${ic('x')}</button></div>
+      <div class="modal-head"><h2>${ic(newMember ? 'user' : 'sliders')} ${newMember ? tx('New crew member', 'Nuevo tripulante') : welcome ? tx('Set up your mission', 'Configura tu misión') : tx('Mission settings', 'Ajustes de misión')}</h2><button type="button" class="icon-btn" data-close-btn aria-label="${tx('Close', 'Cerrar')}">${ic('x')}</button></div>
       ${replacing ? `<p class="small muted">${tx('A new mission will start with no logs. The demo data will be removed from this browser.', 'Se empezará una misión nueva, sin registros. Los datos de demostración se borrarán de este navegador.')}</p>` : ''}
-      <form id="settings-form" class="settings-form" novalidate${welcome ? ' data-fresh="1"' : ''}>
+      ${newMember ? `<p class="small muted">${tx(`The new crew member starts at level 1 with no logs. ${esc(cur.name || '')} stays saved in the crew list, at level ${A.progress.level}.`, `El nuevo tripulante empieza en el nivel 1, sin registros. ${esc(cur.name || '')} queda guardado en la tripulación, en el nivel ${A.progress.level}.`)}</p>` : ''}
+      <form id="settings-form" class="settings-form" novalidate${welcome === true ? ' data-fresh="1"' : ''}${newMember ? ' data-crew="1"' : ''}>
         <label>${tx('Astronaut name', 'Nombre del astronauta')}<input name="name" required maxlength="40" value="${esc(p.name)}" placeholder="${tx('Your name', 'Tu nombre')}" autocomplete="off"></label>
         <label>${tx('Mission name', 'Nombre de la misión')}<input name="mission" maxlength="40" value="${esc(p.mission)}" placeholder="${tx('e.g. South Pole Base', 'Ej.: Base Lunar Sur')}" autocomplete="off"></label>
         <label class="span2">${tx('Mission environment', 'Entorno de la misión')}<select name="env">${Object.values(V.ENVIRONMENTS).map((e) => `<option value="${e.id}" ${e.id === p.env ? 'selected' : ''}>${esc(e.name)}</option>`).join('')}</select></label>
@@ -1210,9 +1250,13 @@
         <label>${tx('Mission start date', 'Inicio de la misión')}<input type="date" name="missionStart" value="${esc(p.missionStart || '')}" max="${V.dayKey(new Date())}"></label>
         <label>${tx('Baseline body mass (kg)', 'Masa corporal base (kg)')}<input type="number" name="baselineMass" min="30" max="200" step="0.1" value="${p.baselineMass == null ? '' : esc(p.baselineMass)}" placeholder="${tx('e.g. 72', 'Ej.: 72')}"></label>
         <p class="form-error span2" id="settings-error" role="alert"></p>
-        <div class="btn-row end span2"><button type="submit" class="btn btn-primary">${ic('check')} ${welcome ? tx('Start mission', 'Empezar misión') : tx('Save', 'Guardar')}</button></div>
+        <div class="btn-row end span2"><button type="submit" class="btn btn-primary">${ic('check')} ${newMember ? tx('Add crew member', 'Añadir tripulante') : welcome ? tx('Start mission', 'Empezar misión') : tx('Save', 'Guardar')}</button></div>
       </form>
       ${welcome ? '' : `
+      <hr>
+      <h3>${tx('Crew', 'Tripulación')}</h3>
+      <p class="small muted">${tx(`Active crew member: ${esc(state.profile ? state.profile.name : '')}, level ${A.progress.level}. Each crew member keeps their own logs, XP and level. Editing the name above only renames this crew member.`, `Tripulante activo: ${esc(state.profile ? state.profile.name : '')}, nivel ${A.progress.level}. Cada tripulante conserva sus propios registros, XP y nivel. Editar el nombre de arriba solo cambia el nombre de este tripulante.`)}</p>
+      <div class="btn-row"><button type="button" class="btn" data-action="crew">${ic('user')} ${tx('Switch or add crew member', 'Cambiar o añadir tripulante')}</button></div>
       <hr>
       <h3>${tx('Data', 'Datos')}</h3>
       <p class="small muted">${tx(`Your logs are stored only in this browser (${state.records.length} logs).`, `Tus registros se guardan solo en este navegador (${state.records.length} registros).`)}${cloudOn()
@@ -1241,6 +1285,16 @@
     const start = String(fd.get('missionStart') || '') || V.dayKey(new Date());
     const fresh = form.dataset.fresh === '1';
     const values = { name, mission: String(fd.get('mission') || '').trim(), env: String(fd.get('env') || 'iss'), missionStart: start, baselineMass: mass };
+    if (form.dataset.crew === '1') {
+      state = V.switchCrew(state, null, values);
+      region = 'heart';
+      lastResult = null;
+      closeModal(true);
+      commit({ quiet: true });
+      setView('log');
+      toast(tx(`${name} joined the crew at level 1`, `${name} se unió a la tripulación en el nivel 1`), 'badge', 'rocket');
+      return;
+    }
     if (fresh) {
       state = V.defaultState();
       state.profile = values;
@@ -1258,25 +1312,74 @@
     }
   }
 
-  function loadDemo(askFirst) {
-    const hasOwn = state.records.length && !(state.profile && state.profile.demo);
+  /* ================================================================== Crew */
+  // Each crew member keeps their own logs, XP and level on this device
+  function openCrew() {
+    const list = V.crewList(state);
+    const row = (m) => `
+      <li class="crew-item${m.active ? ' active' : ''}">
+        <span class="crew-lv" aria-hidden="true">${m.level}</span>
+        <div class="crew-info"><strong>${esc(m.name || tx('Astronaut', 'Astronauta'))}${m.demo ? ' · demo' : ''}</strong>
+          <span>${tx('Level', 'Nivel')} ${m.level} · ${esc(m.rank)} · ${m.xp} XP · ${m.logs} ${m.logs === 1 ? tx('log', 'registro') : tx('logs', 'registros')}</span>
+          ${m.mission ? `<span>${esc(m.mission)}</span>` : ''}</div>
+        ${m.active
+          ? `<span class="pill lvl-ok">${tx('Active', 'Activo')}</span>`
+          : `<div class="crew-acts"><button type="button" class="btn btn-sm btn-primary" data-action="crew-switch" data-id="${esc(m.id)}">${tx('Switch', 'Cambiar')}</button>
+             <button type="button" class="icon-btn sm" data-action="crew-remove" data-id="${esc(m.id)}" aria-label="${esc(tx(`Remove ${m.name}`, `Quitar a ${m.name}`))}" title="${tx('Remove crew member', 'Quitar tripulante')}">${ic('trash')}</button></div>`}
+      </li>`;
+    openModal(`
+      <div class="modal-head"><h2>${ic('user')} ${tx('Crew', 'Tripulación')}</h2><button type="button" class="icon-btn" data-close-btn aria-label="${tx('Close', 'Cerrar')}">${ic('x')}</button></div>
+      <p class="small muted">${tx('Each crew member keeps their own logs, XP and level. Switch to continue exactly where they left off. A new crew member starts at level 1.', 'Cada tripulante conserva sus propios registros, XP y nivel. Al cambiar, sigue exactamente donde iba. Un tripulante nuevo empieza en el nivel 1.')}</p>
+      <ul class="crew-list">${list.map(row).join('')}</ul>
+      <div class="btn-row"><button type="button" class="btn btn-primary" data-action="crew-add">${ic('plus')} ${tx('Add crew member', 'Añadir tripulante')}</button></div>`, { label: tx('Crew', 'Tripulación') });
+  }
+
+  function switchCrew(id) {
+    const next = V.switchCrew(state, id);
+    if (!next) return;
+    state = next;
+    V.relocalizeDemo(state);
+    region = 'heart';
+    lastResult = null;
+    reportCache = '';
+    closeModal(true);
+    commit({ quiet: true });
+    toast(tx(`Active crew member: ${state.profile.name} · level ${A.progress.level}`, `Tripulante activo: ${state.profile.name} · nivel ${A.progress.level}`), 'info', 'user');
+  }
+
+  function removeCrew(id) {
+    const m = V.crewList(state).find((x) => x.id === id && !x.active);
+    if (!m) return;
+    confirmDialog({
+      title: tx('Remove crew member', 'Quitar tripulante'),
+      text: tx(`${m.name} and their logs (${m.logs}, level ${m.level}, ${m.xp} XP) will be deleted from this browser. This cannot be undone.`, `Se borrarán de este navegador ${m.name} y sus registros (${m.logs}, nivel ${m.level}, ${m.xp} XP). No se puede deshacer.`),
+      yes: tx('Remove', 'Quitar')
+    }, () => {
+      V.removeCrew(id);
+      toast(tx(`${m.name} was removed from the crew`, `${m.name} salió de la tripulación`), 'info', 'trash');
+      openCrew();
+    });
+  }
+
+  function loadDemo() {
+    const hasOwn = state.profile && !state.profile.demo;
     const go = () => {
+      const outbox = state.outbox;
+      if (hasOwn) V.stashCrew(state); // the current crew member stays in the crew list
+      V.removeCrew('demo');
       state = V.makeDemo();
+      state.outbox = outbox;
       region = 'heart';
       closeModal(true);
       V.saveState(state);
       refresh();
       setView('dashboard');
       renderHeader(); renderSidebarXP(); renderReminder();
-      toast(tx('Demo mission loaded: 30 days in transit to Mars', 'Misión de demostración cargada: 30 días en tránsito a Marte'), 'info', 'rocket');
+      toast(hasOwn
+        ? tx('Demo mission loaded. Your crew member is saved in the crew list.', 'Misión de demostración cargada. Tu tripulante queda guardado en la tripulación.')
+        : tx('Demo mission loaded: 30 days in transit to Mars', 'Misión de demostración cargada: 30 días en tránsito a Marte'), 'info', 'rocket');
     };
-    if (askFirst && hasOwn) {
-      confirmDialog({
-        title: tx('Load the demo mission', 'Cargar la demostración'),
-        text: tx('Your current logs will be replaced by the demo mission. To keep them, export them first from Settings.', 'Tus registros actuales se reemplazarán por la misión de demostración. Si quieres conservarlos, expórtalos antes desde Ajustes.'),
-        yes: tx('Replace my data', 'Reemplazar mis datos')
-      }, go);
-    } else go();
+    go();
   }
 
   function wipe() {
@@ -1284,8 +1387,8 @@
     confirmDialog({
       title: tx('Delete all data', 'Borrar todos los datos'),
       text: linked
-        ? tx('All your logs and settings stored in this browser will be deleted, together with the reports this browser sent to the Mission Control database. This cannot be undone.', 'Se borrarán todos tus registros y ajustes guardados en este navegador, junto con los reportes que este navegador envió a la base de datos del control de misión. No se puede deshacer.')
-        : tx('All your logs and settings stored in this browser will be deleted. This cannot be undone.', 'Se borrarán todos tus registros y ajustes guardados en este navegador. No se puede deshacer.'),
+        ? tx('All crew members, logs and settings stored in this browser will be deleted, together with the reports this browser sent to the Mission Control database. This cannot be undone.', 'Se borrarán todos los tripulantes, registros y ajustes guardados en este navegador, junto con los reportes que este navegador envió a la base de datos del control de misión. No se puede deshacer.')
+        : tx('All crew members, logs and settings stored in this browser will be deleted. This cannot be undone.', 'Se borrarán todos los tripulantes, registros y ajustes guardados en este navegador. No se puede deshacer.'),
       yes: tx('Delete everything', 'Borrar todo')
     }, () => {
       if (linked) {
@@ -1295,6 +1398,7 @@
       }
       cloudRows = null;
       cloudErr = null;
+      V.clearCrew();
       state = V.defaultState();
       V.saveState(state);
       refresh();
@@ -1622,6 +1726,10 @@
       case 'report': openReport(); break;
       case 'settings': openSettings(false); break;
       case 'install': installApp(); break;
+      case 'crew': openCrew(); break;
+      case 'crew-add': openSettings('crew'); break;
+      case 'crew-switch': switchCrew(el.dataset.id); break;
+      case 'crew-remove': removeCrew(el.dataset.id); break;
       case 'install-later':
         try { localStorage.setItem(INSTALL_KEY, 'later'); } catch (e) { /* ignore */ }
         renderInstallBar();
@@ -1654,8 +1762,8 @@
         if (state.ui) state.ui.intro = false;
         commit({ quiet: true });
         break;
-      case 'demo': loadDemo(true); break;
-      case 'demo-welcome': loadDemo(false); break;
+      case 'demo': loadDemo(); break;
+      case 'demo-welcome': loadDemo(); break;
       case 'setup': openSettings(true); break;
       case 'export': openExport(); break;
       case 'import': $('#import-file').click(); break;

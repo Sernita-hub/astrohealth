@@ -141,6 +141,20 @@ button { cursor: pointer; }
   padding: 8px 14px; border-radius: 12px;
   background: var(--surface); border: 1px solid var(--border);
 }
+/* The astronaut card opens the crew switcher */
+button.mi-who { font: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
+button.mi-who:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--surface-2); }
+button.mi-who:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Crew list */
+.crew-list { list-style: none; margin: 4px 0 16px; padding: 0; display: grid; gap: 8px; }
+.crew-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.crew-item.active { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.crew-lv { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; font-weight: 700; color: var(--bg, #060a13); background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+.crew-info { flex: 1; min-width: 0; }
+.crew-info strong { display: block; overflow-wrap: anywhere; }
+.crew-info span { display: block; font-size: 12px; color: var(--muted); }
+.crew-acts { display: flex; align-items: center; gap: 6px; }
 .mi-who .ic, .mi-chip .ic { width: 18px; height: 18px; color: var(--accent); }
 .mi-who strong, .mi-chip strong { display: block; font-size: 14px; line-height: 1.2; }
 .mi-who span, .mi-chip span { display: block; font-size: 11px; color: var(--muted); line-height: 1.2; }

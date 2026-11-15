@@ -144,6 +144,15 @@
         g.strokeStyle = r.color || col.watch;
         g.globalAlpha = 0.7;
         g.beginPath(); g.moveTo(P.l, y); g.lineTo(P.l + pw, y); g.stroke();
+        if (r.label) {
+          g.setLineDash([]);
+          g.globalAlpha = 0.95;
+          g.fillStyle = r.color || col.watch;
+          g.font = '11px ' + (css('--font') || 'system-ui, sans-serif');
+          g.textAlign = 'left';
+          g.textBaseline = 'bottom';
+          g.fillText(r.label, P.l + 6, y - 3);
+        }
         g.restore();
       });
 

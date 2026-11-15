@@ -102,6 +102,8 @@
         }))
       : [];
     V.sortRecords(out.records);
+    // Every crew member has an id, so their logs and XP can be stored apart (see "Crew")
+    if (out.profile && !out.profile.id) out.profile = Object.assign({}, out.profile, { id: out.profile.demo ? 'demo' : V.newId() });
     return out;
   };
 
@@ -503,6 +505,124 @@
     return { xp, level, rank, into, need, streak, bestStreak, earned, values, perfect, breath, reports };
   };
 
+  // Level reached with a given amount of XP
+  V.levelFor = (xp) => {
+    let level = 1, floor = 0;
+    while (xp >= floor + V.xpForLevel(level)) { floor += V.xpForLevel(level); level++; }
+    return level;
+  };
+
+  // XP accumulated day by day, with the same rules as V.progress (it ends at the same total).
+  // Region visits have no date, so they count on the last day.
+  V.xpHistory = (state, days, now = new Date()) => {
+    const gain = new Map();
+    const add = (key, n) => gain.set(key, (gain.get(key) || 0) + n);
+    for (const r of state.records) {
+      const k = V.dayKey(r.ts);
+      add(k, Object.values(r.values || {}).filter((v) => v != null).length * 10 + (r.symptoms && r.symptoms.length ? 5 : 0));
+    }
+    const bdays = breathDays(state);
+    for (const k of days.keys()) if (V.dayComplete(state, days, k, bdays)) add(k, 50);
+    state.events.breath.forEach((ts) => add(V.dayKey(ts), 15));
+    state.events.reports.forEach((ts) => add(V.dayKey(ts), 25));
+    const today = V.dayKey(now);
+    if (state.events.visited.length) add(today, state.events.visited.length * 5);
+    if (!gain.size) return { keys: [], xp: [], levels: [] };
+    const sorted = [...gain.keys()].sort();
+    const last = sorted[sorted.length - 1] > today ? sorted[sorted.length - 1] : today;
+    const keys = [], xp = [], levels = [];
+    let total = 0;
+    for (let d = V.keyToDate(sorted[0]); V.dayKey(d) <= last; d = V.addDays(d, 1)) {
+      const k = V.dayKey(d);
+      total += gain.get(k) || 0;
+      keys.push(k); xp.push(total); levels.push(V.levelFor(total));
+    }
+    return { keys, xp, levels };
+  };
+
+  /* ------------------------------------------------------------------ Crew */
+  // Each crew member keeps their own logs, XP and level. The active member is the main
+  // state; the others wait in a separate store and come back exactly where they left off.
+  const CREW_KEY = 'astrohealth.crew.v1';
+  let crewMemory = null;
+
+  V.loadCrew = () => {
+    try {
+      const raw = localStorage.getItem(CREW_KEY);
+      if (raw) { const c = JSON.parse(raw); if (c && c.members && typeof c.members === 'object') return c; }
+    } catch (e) { /* storage unavailable */ }
+    return crewMemory ? JSON.parse(crewMemory) : { version: 1, members: {} };
+  };
+
+  V.saveCrew = (crew) => {
+    const json = JSON.stringify(crew);
+    crewMemory = json;
+    try { localStorage.setItem(CREW_KEY, json); return true; } catch (e) { return false; }
+  };
+
+  V.clearCrew = () => {
+    crewMemory = null;
+    try { localStorage.removeItem(CREW_KEY); } catch (e) { /* ignore */ }
+  };
+
+  // Name, mission and level of one crew member's saved state
+  V.crewSummary = (s) => {
+    V.relocalizeDemo(s); // the demo's texts follow the current language
+    const days = V.buildDays(s.records);
+    const pr = V.progress(s, days, V.ctx(s));
+    const p = s.profile || {};
+    return { id: p.id, name: p.name || '', mission: p.mission || '', demo: !!p.demo, level: pr.level, rank: pr.rank, xp: pr.xp, logs: s.records.length };
+  };
+
+  // Everyone on this device: the active member first
+  V.crewList = (state) => {
+    const crew = V.loadCrew();
+    const list = state.profile ? [Object.assign(V.crewSummary(state), { active: true })] : [];
+    Object.values(crew.members).forEach((m) => {
+      const s = V.normalizeState(m);
+      if (s.profile && (!state.profile || s.profile.id !== state.profile.id)) list.push(V.crewSummary(s));
+    });
+    return list;
+  };
+
+  // Stores the active member and returns the next one: a saved member (by id) or a new one
+  // (from `newProfile`, starting at level 1). Reports waiting for a signal belong to the
+  // device, not to one astronaut, so the outbox moves to whoever is active.
+  V.switchCrew = (current, targetId, newProfile) => {
+    const crew = V.loadCrew();
+    let next;
+    if (targetId) {
+      if (!crew.members[targetId]) return null;
+      next = V.normalizeState(crew.members[targetId]);
+      delete crew.members[targetId];
+    } else {
+      next = V.defaultState();
+      next.profile = Object.assign({}, newProfile, { id: V.newId() });
+    }
+    next.outbox = (current.outbox || []).concat(next.outbox || []);
+    stash(crew, current);
+    V.saveCrew(crew);
+    return next;
+  };
+
+  // Keeps the active member in the crew store (used before loading the demo, for example)
+  function stash(crew, current) {
+    if (current && current.profile && (current.records.length || !current.profile.demo)) {
+      crew.members[current.profile.id] = Object.assign({}, current, { outbox: [] });
+    }
+  }
+  V.stashCrew = (current) => {
+    const crew = V.loadCrew();
+    stash(crew, current);
+    V.saveCrew(crew);
+  };
+
+  V.removeCrew = (id) => {
+    const crew = V.loadCrew();
+    delete crew.members[id];
+    V.saveCrew(crew);
+  };
+
   /* ------------------------------------------------------------- Demo data */
   // Demo texts in both languages, so switching language also translates the demo
   const DEMO_TEXT = {
@@ -596,7 +716,8 @@
         env: 'transit',
         missionStart: V.dayKey(start),
         baselineMass: 72,
-        demo: true
+        demo: true,
+        id: 'demo'
       },
       records,
       events: { breath: [evAt(10, 13, 5), evAt(23, 13, 10)], reports: [evAt(22, 22, 0)], visited: [] }

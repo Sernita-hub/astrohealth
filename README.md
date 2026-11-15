@@ -42,7 +42,7 @@ Logs are stored only in the browser (`localStorage`). Reports you transmit to Ea
 | A human figure with clickable body parts | **3D holographic body map** that you can rotate. It has 10 regions (brain, eyes, lungs, heart, blood and immunity, digestion, kidneys, bones, muscles, skin and radiation), and each organ glows in the color of its health status. Choosing a region zooms the camera in on it and shows what it does, how space affects it, the current data and what to do |
 | Different environments (spacecraft, station, rover, base) | 5 environments with their own gravity, typical radiation, exercise goal and real **communication delay** (from real time on the ISS to up to ~20 min from Mars) |
 | Prompt measurements as part of the mission routine | **Daily routine** with scheduled times and **reminders** when a task is overdue |
-| Gamification | XP, levels and ranks, streaks, "perfect days" and 11 badges |
+| Gamification | XP, levels and ranks, streaks, "perfect days" and 11 badges, plus an **XP growth chart** that shows the total XP day by day with a line at each level. Several astronauts can share a device: each **crew member** keeps their own logs, XP and level. A new crew member starts at level 1, and switching back continues where they left off (tap the astronaut's name at the top) |
 | Dynamic charts | **Trends** over 7, 14 or 30 days with normal / watch / critical color bands, statistics and trend direction |
 | Don't assume astronauts know how to assess their health | Every field has **How to measure** and **Why it matters in space**; the **Guide** explains the 5 hazards of human spaceflight |
 
