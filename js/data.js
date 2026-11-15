@@ -3,6 +3,7 @@
    Health indicators, mission environments, spaceflight hazards,
    body regions, symptoms and daily routine.
    Ranges are approximate and for educational purposes (not a medical device).
+   Sources for each figure: README, "Sources for the figures".
    SI notice: code and reference data generated with Claude (Anthropic),
    a Super Intelligence (SI) tool. See README, "Use of Super Intelligence (SI)".
    ========================================================================= */
@@ -15,6 +16,11 @@ window.AH = window.AH || {};
    delaySec: one-way communication delay with Earth (s)
    exerciseTarget: recommended daily exercise minutes
    boneRate: estimated monthly bone loss without countermeasures (%/month)
+   Measured references: ISS ~0.44–0.5 mSv/day (NASA), Moon surface 1.37 mSv/day
+   (Chang'E 4, Zhang et al. 2020), Mars cruise 1.8 mSv/day and Mars surface
+   0.64 mSv/day (Curiosity RAD, NASA/JPL; Hassler et al. 2014), ISS exercise
+   ~2 h/day and bone loss 1–1.5%/month (NASA). Exercise targets and bone rates
+   for the Moon and Mars are AstroHealth assumptions: there is no measured data yet.
    ------------------------------------------------------------------------- */
 AH.ENVIRONMENTS = {
   iss: {
@@ -49,7 +55,7 @@ AH.ENVIRONMENTS = {
     short: 'Lunar rover',
     gravity: 0.166,
     gravityLabel: 'Lunar gravity (0.17 g)',
-    radBaseline: 1.5,
+    radBaseline: 1.37,
     delaySec: 1.3,
     delayLabel: '1.3 s',
     exerciseTarget: 60,
@@ -77,10 +83,10 @@ AH.ENVIRONMENTS = {
     gravityLabel: 'Martian gravity (0.38 g)',
     radBaseline: 0.64,
     delaySec: 750,
-    delayLabel: '4–24 min (today ~12 min)',
+    delayLabel: 'Up to ~20 min (average ~12.5 min)',
     exerciseTarget: 90,
     boneRate: 0.93,
-    note: "Mars' thin atmosphere offers little protection, and messages to Earth take up to 24 minutes."
+    note: "Mars' thin atmosphere offers little protection, and messages to Earth take up to about 20 minutes one way."
   }
 };
 
@@ -125,8 +131,8 @@ AH.INDICATORS = {
     id: 'sys', name: 'Systolic pressure', short: 'SBP', unit: 'mmHg', icon: 'gauge',
     min: 50, max: 260, step: 1, decimals: 0, agg: 'avg', staleHours: 36, weight: 0.5,
     region: 'heart', hazards: ['G', 'R', 'I'], group: 'vitals', pairOf: 'bp',
-    rangeText: '90–129 mmHg',
-    status: (v) => rangeStatus(v, 90, 129, 80, 159),
+    rangeText: '90–119 mmHg',
+    status: (v) => rangeStatus(v, 90, 119, 80, 159), // AHA: normal < 120/80
     how: "Use the automatic cuff on your arm, at heart level, after 5 minutes of rest. Anchor your feet so you don't float, and don't talk during the reading. Systolic is the higher number.",
     why: 'The headward fluid shift changes blood pressure, and stress and radiation may raise long-term cardiovascular risk.',
     actions: {
@@ -140,8 +146,8 @@ AH.INDICATORS = {
     id: 'dia', name: 'Diastolic pressure', short: 'DBP', unit: 'mmHg', icon: 'gauge',
     min: 30, max: 160, step: 1, decimals: 0, agg: 'avg', staleHours: 36, weight: 0.5,
     region: 'heart', hazards: ['G', 'R', 'I'], group: 'vitals', pairOf: 'bp',
-    rangeText: '60–84 mmHg',
-    status: (v) => rangeStatus(v, 60, 84, 50, 99),
+    rangeText: '60–79 mmHg',
+    status: (v) => rangeStatus(v, 60, 79, 50, 99), // AHA: normal < 80
     how: 'Taken in the same reading as systolic pressure: it is the lower number.',
     why: 'The headward fluid shift changes blood pressure, and stress and radiation may raise long-term cardiovascular risk.',
     actions: {
@@ -155,8 +161,8 @@ AH.INDICATORS = {
     id: 'glucose', name: 'Blood glucose', short: 'Glucose', unit: 'mg/dL', icon: 'drop',
     min: 20, max: 600, step: 1, decimals: 0, agg: 'avg', staleHours: 36, weight: 0.7,
     region: 'gut', hazards: ['G', 'E'], group: 'vitals',
-    rangeText: '70–110 mg/dL (fasting)',
-    status: (v) => rangeStatus(v, 70, 110, 54, 180),
+    rangeText: '70–99 mg/dL (fasting)',
+    status: (v) => rangeStatus(v, 70, 99, 54, 180), // CDC: fasting normal ≤ 99, prediabetes 100–125
     how: 'With the glucometer: clean your finger, prick the side of the fingertip and place the drop on the strip. Ideally fasting, right after waking up.',
     why: 'Muscle inactivity, stress and diet changes during flight can reduce insulin sensitivity.',
     actions: {
@@ -278,7 +284,7 @@ AH.INDICATORS = {
     rangeText: '≥ 2.0 L/day',
     status: (v) => (v >= 2 ? { level: 'ok', dir: null } : v >= 1.5 ? { level: 'watch', dir: 'low' } : { level: 'crit', dir: 'low' }),
     how: "Liters of fluid you drank today (water and rehydrated drinks). Log the day's total.",
-    why: 'Thirst is blunted in microgravity. Dehydration raises the risk of kidney stones, which is already higher because of the calcium released from bones.',
+    why: 'Dehydration raises the risk of kidney stones, which is already higher in space because bones release more calcium.',
     actions: {
       watch: ['Drink a glass of water now and set reminders.'],
       crit: ['Drink at least 0.5 L within the next hour.', 'Dehydration raises the risk of kidney stones, so report any flank pain.']
@@ -299,7 +305,7 @@ AH.INDICATORS = {
       return { level: 'crit', dir };
     },
     how: 'There are no scales in microgravity: a device measures mass using linear acceleration. Measure once a week, at the same time, before eating.',
-    why: 'Weight loss is common on long missions because of reduced appetite and changes in taste. Losing more than 5% affects muscle, bone and immunity.',
+    why: 'Weight loss is common on long missions because of reduced appetite and changes in taste. NASA counts inadequate food and nutrition among the risks of spaceflight.',
     actions: {
       watch_low: ['Eat more: add an extra snack each day.', 'Try more flavorful foods (taste is dulled in space).'],
       crit_low: ['Significant loss: review your nutrition plan with the flight surgeon.'],
@@ -330,7 +336,7 @@ AH.SYMPTOMS = {
   chest: { id: 'chest', name: 'Chest pain', level: 'crit', regions: ['heart'],
     advice: 'Stop all activity and start the medical emergency protocol with the CMO.' },
   back: { id: 'back', name: 'Back pain', level: 'watch', regions: ['bones'],
-    advice: 'The spine lengthens up to 5 cm without gravity. Stretching in a fetal position often helps.' },
+    advice: 'Without gravity the spine lengthens, and astronauts can grow up to 3% taller. Stretching in a fetal position often helps.' },
   fatigue: { id: 'fatigue', name: 'Unusual fatigue', level: 'watch', regions: ['blood', 'brain'],
     advice: 'Check your sleep, temperature and hydration. "Space anemia" can also cause tiredness.' },
   insomnia: { id: 'insomnia', name: 'Trouble sleeping', level: 'watch', regions: ['brain'],
@@ -340,7 +346,7 @@ AH.SYMPTOMS = {
   flank: { id: 'flank', name: 'Flank pain or pain when urinating', level: 'crit', regions: ['kidneys'],
     advice: 'Possible kidney stone (the risk is higher in space). Drink fluids and alert the CMO.' },
   skin: { id: 'skin', name: 'Skin irritation or wound', level: 'watch', regions: ['skin'],
-    advice: 'Wounds may heal more slowly in flight. Clean and cover them and watch for signs of infection.' }
+    advice: 'Clean and cover it and watch for signs of infection: the immune system changes in flight.' }
 };
 
 /* -------------------------------------------------------------------------
@@ -363,7 +369,7 @@ AH.HAZARDS = {
   },
   D: {
     id: 'D', name: 'Distance from Earth', icon: 'signal',
-    text: 'Far from Earth there is no quick evacuation. From Mars, a message takes 4 to 24 minutes to arrive.',
+    text: 'Far from Earth there is no quick evacuation. From Mars, a message can take up to about 20 minutes to arrive, one way.',
     effects: 'The crew must detect, diagnose and treat problems on their own, with limited medical supplies.',
     counter: 'Self-assessment tools like AstroHealth, clear protocols, medical training and criteria for escalating to the flight surgeon.',
     indicators: ['mood', 'mass']
@@ -435,7 +441,7 @@ AH.REGIONS = {
     id: 'bones', name: 'Bones and spine', x: 122, y: 322,
     indicators: ['exercise'], derived: ['boneLoss'], hazards: ['G'],
     func: 'Support the body, protect organs and store calcium.',
-    space: 'Without load, the bones of the hips, spine and legs lose about 1–1.5% of their mineral density per month. The spine lengthens by up to 5 cm, which causes back pain.'
+    space: 'Without load, the bones of the hips, spine and legs lose about 1–1.5% of their mineral density per month. The spine lengthens and astronauts can grow up to 3% taller, which can cause back pain.'
   },
   muscles: {
     id: 'muscles', name: 'Muscles', x: 178, y: 404,
@@ -447,7 +453,7 @@ AH.REGIONS = {
     id: 'skin', name: 'Skin and radiation exposure', x: 90, y: 152,
     indicators: ['radiation'], derived: ['cumDose'], hazards: ['R'],
     func: "The body's barrier against the environment.",
-    space: 'Space radiation passes through the spacecraft and the body, and bone marrow and other tissues are sensitive to it. Wounds may heal more slowly in flight.'
+    space: 'Space radiation passes through the spacecraft and the body, and bone marrow and other tissues are sensitive to it.'
   }
 };
 
@@ -490,11 +496,14 @@ AH.BADGES = [
   { id: 'scientist', name: 'Self-scientist', desc: 'Log 100 values', icon: 'chart' }
 ];
 
-/* Official challenge resources */
+/* Challenge resources and the main sources for the figures (full list in the README) */
 AH.RESOURCES = [
   { name: '5 Hazards of Human Spaceflight', org: 'NASA HRP', url: 'https://www.nasa.gov/hrp/hazards/' },
   { name: 'Risks of Human Spaceflight', org: 'NASA HRP', url: 'https://www.nasa.gov/hrp/risks/' },
   { name: 'Ongoing HRP Research in Space', org: 'NASA HRP', url: 'https://www.nasa.gov/hrp/ongoing-hrp-research/' },
+  { name: 'The Human Body in Space', org: 'NASA', url: 'https://www.nasa.gov/humans-in-space/the-human-body-in-space/' },
+  { name: 'Radiation Protection (NASA-STD-3001 technical brief)', org: 'NASA', url: 'https://www.nasa.gov/wp-content/uploads/2023/12/ochmo-tb-020-radiation-protection.pdf' },
+  { name: "Data From NASA Rover's Voyage to Mars Aids Planning", org: 'NASA JPL', url: 'https://www.jpl.nasa.gov/news/data-from-nasa-rovers-voyage-to-mars-aids-planning/' },
   { name: 'Monitoring Radiation for Astronaut Health', org: 'Canadian Space Agency (CSA)', url: 'https://www.asc-csa.gc.ca/eng/news/articles/2026/2026-02-26-monitoring-radiation-astronaut-health.asp' },
   { name: 'Why Do We Conduct Science Experiments in Space?', org: 'Canadian Space Agency (CSA)', url: 'https://www.asc-csa.gc.ca/eng/iss/science/why-do-we-conduct-science-experiments-in-space.asp' }
 ];

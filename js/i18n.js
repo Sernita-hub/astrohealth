@@ -63,8 +63,8 @@
         note: 'Espacio muy reducido durante días: el confinamiento, el sueño y la calidad del aire son clave.' },
       transit: { name: 'Nave en tránsito a Marte', short: 'Tránsito a Marte', gravityLabel: 'Microgravedad (~0 g)', delayLabel: '~10 min',
         note: 'Meses de viaje sin posibilidad de regreso rápido: la tripulación debe ser autónoma.' },
-      mars: { name: 'Base en la superficie de Marte', short: 'Base en Marte', gravityLabel: 'Gravedad marciana (0,38 g)', delayLabel: '4–24 min (hoy ~12 min)',
-        note: 'La delgada atmósfera marciana protege poco; los mensajes a la Tierra tardan hasta 24 minutos.' }
+      mars: { name: 'Base en la superficie de Marte', short: 'Base en Marte', gravityLabel: 'Gravedad marciana (0,38 g)', delayLabel: 'Hasta ~20 min (promedio ~12,5 min)',
+        note: 'La delgada atmósfera marciana protege poco; los mensajes a la Tierra tardan hasta unos 20 minutos en cada sentido.' }
     },
 
     INDICATORS: {
@@ -79,7 +79,7 @@
         }
       },
       sys: {
-        name: 'Presión sistólica', short: 'PAS', unit: 'mmHg', rangeText: '90–129 mmHg',
+        name: 'Presión sistólica', short: 'PAS', unit: 'mmHg', rangeText: '90–119 mmHg',
         how: 'Con el tensiómetro automático en el brazo, a la altura del corazón y tras 5 minutos de reposo. Ancla los pies para no flotar y no hables durante la medición. La sistólica es el número mayor.',
         why: 'El desplazamiento de fluidos hacia la cabeza modifica la presión arterial; el estrés y la radiación podrían aumentar el riesgo cardiovascular a largo plazo.',
         actions: {
@@ -90,7 +90,7 @@
         }
       },
       dia: {
-        name: 'Presión diastólica', short: 'PAD', unit: 'mmHg', rangeText: '60–84 mmHg',
+        name: 'Presión diastólica', short: 'PAD', unit: 'mmHg', rangeText: '60–79 mmHg',
         how: 'Se obtiene en la misma medición que la sistólica: es el número menor.',
         why: 'El desplazamiento de fluidos hacia la cabeza modifica la presión arterial; el estrés y la radiación podrían aumentar el riesgo cardiovascular a largo plazo.',
         actions: {
@@ -101,7 +101,7 @@
         }
       },
       glucose: {
-        name: 'Glucosa en sangre', short: 'Glucosa', unit: 'mg/dL', rangeText: '70–110 mg/dL (en ayunas)',
+        name: 'Glucosa en sangre', short: 'Glucosa', unit: 'mg/dL', rangeText: '70–99 mg/dL (en ayunas)',
         how: 'Con el glucómetro: limpia el dedo, punciona el costado de la yema y coloca la gota en la tira. Idealmente en ayunas, al despertar.',
         why: 'La inactividad muscular, el estrés y los cambios en la dieta durante el vuelo pueden reducir la sensibilidad a la insulina.',
         actions: {
@@ -183,7 +183,7 @@
       water: {
         name: 'Hidratación', short: 'Agua', unit: 'L', rangeText: '≥ 2,0 L/día',
         how: 'Litros de líquido bebidos hoy (agua y bebidas rehidratadas). Registra el total del día.',
-        why: 'En microgravedad la sensación de sed disminuye. Deshidratarse aumenta el riesgo de cálculos renales, ya elevado por el calcio que liberan los huesos.',
+        why: 'Deshidratarse aumenta el riesgo de cálculos renales, que ya es mayor en el espacio porque los huesos liberan más calcio.',
         actions: {
           watch: ['Bebe un vaso de agua ahora y programa recordatorios.'],
           crit: ['Bebe al menos 0,5 L en la próxima hora.', 'La deshidratación aumenta el riesgo de cálculos renales: avisa si tienes dolor en el costado.']
@@ -193,7 +193,7 @@
         name: 'Masa corporal', short: 'Masa', unit: 'kg',
         rangeText: (env, profile) => (profile && profile.baselineMass ? `±2 % de tu línea base (${fmt1(profile.baselineMass)} kg)` : 'Define tu masa base en Ajustes'),
         how: 'En microgravedad no hay báscula: se usa un dispositivo que mide la masa por aceleración lineal. Mídela una vez por semana, a la misma hora y antes de comer.',
-        why: 'Perder peso es frecuente en misiones largas por menor apetito y cambios en el gusto. Una pérdida mayor al 5 % afecta músculo, hueso e inmunidad.',
+        why: 'Perder peso es frecuente en misiones largas por menor apetito y cambios en el gusto. La NASA incluye la alimentación y nutrición inadecuadas entre los riesgos de los vuelos espaciales.',
         actions: {
           watch_low: ['Aumenta la ingesta: añade un refrigerio extra al día.', 'Prueba alimentos con más sabor (los sabores se perciben menos en el espacio).'],
           crit_low: ['Pérdida importante: revisa tu plan de nutrición con el cirujano de vuelo.'],
@@ -210,12 +210,12 @@
       congestion: { name: 'Congestión nasal', advice: 'Frecuente por el desplazamiento de fluidos hacia la cabeza. Afecta al gusto y al apetito.' },
       breath: { name: 'Falta de aire', advice: 'Mide tu SpO₂, revisa la atmósfera de la cabina y alerta a la tripulación.' },
       chest: { name: 'Dolor en el pecho', advice: 'Detén toda actividad y activa el protocolo de emergencia médica con el CMO.' },
-      back: { name: 'Dolor de espalda', advice: 'La columna se alarga hasta 5 cm sin gravedad. Los estiramientos en posición fetal suelen aliviarlo.' },
+      back: { name: 'Dolor de espalda', advice: 'Sin gravedad la columna se alarga y los astronautas pueden crecer hasta un 3 %. Los estiramientos en posición fetal suelen aliviarlo.' },
       fatigue: { name: 'Fatiga inusual', advice: 'Revisa sueño, temperatura e hidratación. La «anemia espacial» también puede causar cansancio.' },
       insomnia: { name: 'Dificultad para dormir', advice: 'Ajusta la iluminación, evita pantallas antes de dormir y mantén un horario fijo.' },
       anxiety: { name: 'Ansiedad o tristeza persistente', advice: 'Habla con alguien de confianza y con el equipo de apoyo psicológico.' },
       flank: { name: 'Dolor en el costado o al orinar', advice: 'Posible cálculo renal (riesgo mayor en el espacio). Bebe líquidos y avisa al CMO.' },
-      skin: { name: 'Irritación o herida en la piel', advice: 'Las heridas pueden sanar más lento en vuelo. Limpia, cubre y vigila signos de infección.' }
+      skin: { name: 'Irritación o herida en la piel', advice: 'Limpia, cubre y vigila signos de infección: el sistema inmunitario cambia en vuelo.' }
     },
 
     HAZARDS: {
@@ -228,7 +228,7 @@
         effects: 'Alteraciones del sueño y del ánimo, estrés, menor rendimiento cognitivo y tensiones en el equipo.',
         counter: 'Horarios de sueño regulares, iluminación adecuada, contacto con seres queridos, ejercicio y check-ins de ánimo.' },
       D: { name: 'Distancia de la Tierra',
-        text: 'Lejos de la Tierra no hay evacuación rápida. Desde Marte un mensaje tarda entre 4 y 24 minutos en llegar.',
+        text: 'Lejos de la Tierra no hay evacuación rápida. Desde Marte un mensaje puede tardar hasta unos 20 minutos en llegar, en cada sentido.',
         effects: 'La tripulación debe detectar, diagnosticar y tratar problemas con autonomía y con suministros médicos limitados.',
         counter: 'Herramientas de autoevaluación como AstroHealth, protocolos claros, entrenamiento médico y criterios para escalar al cirujano de vuelo.' },
       G: { name: 'Campos gravitacionales',
@@ -257,11 +257,11 @@
       kidneys: { name: 'Riñones e hidratación', func: 'Filtran la sangre y regulan los líquidos y minerales del cuerpo.',
         space: 'El calcio que liberan los huesos y la menor ingesta de líquidos aumentan el riesgo de cálculos renales.' },
       bones: { name: 'Huesos y columna', func: 'Sostienen el cuerpo, protegen órganos y almacenan calcio.',
-        space: 'Sin carga, los huesos de cadera, columna y piernas pierden ~1–1,5 % de densidad mineral al mes. La columna se alarga hasta 5 cm, lo que causa dolor de espalda.' },
+        space: 'Sin carga, los huesos de cadera, columna y piernas pierden ~1–1,5 % de densidad mineral al mes. La columna se alarga y los astronautas pueden crecer hasta un 3 %, lo que puede causar dolor de espalda.' },
       muscles: { name: 'Músculos', func: 'Permiten el movimiento y mantienen la postura.',
         space: 'Sin necesidad de sostener el cuerpo, los músculos posturales de piernas y espalda pierden masa y fuerza rápidamente.' },
       skin: { name: 'Piel y exposición a radiación', func: 'Es la barrera del cuerpo contra el entorno.',
-        space: 'La radiación espacial atraviesa la nave y el cuerpo; la médula ósea y otros tejidos son sensibles. Las heridas pueden sanar más lento en vuelo.' }
+        space: 'La radiación espacial atraviesa la nave y el cuerpo; la médula ósea y otros tejidos son sensibles.' }
     },
 
     ROUTINE: {
@@ -293,6 +293,7 @@
     RANKS: ['Cadete', 'Candidato a astronauta', 'Especialista de misión', 'Ingeniero de vuelo', 'Oficial médico', 'Comandante', 'Leyenda orbital'],
     RESOURCES: [
       { org: 'NASA HRP' }, { org: 'NASA HRP' }, { org: 'NASA HRP' },
+      { org: 'NASA' }, { org: 'NASA' }, { org: 'NASA JPL' },
       { org: 'Agencia Espacial Canadiense (CSA)' }, { org: 'Agencia Espacial Canadiense (CSA)' }
     ]
   };

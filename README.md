@@ -38,7 +38,7 @@ Logs are stored only in the browser (`localStorage`). Reports you transmit to Ea
 | Guidance on treatments and health improvements | Every out-of-range value shows **specific actions**, depending on whether it is high or low and whether it needs watching or is critical |
 | When does a result need attention from the crew or flight surgeons? | Three levels, **Normal / Watch / Critical**, with clear escalation criteria and a **Report to Earth** button that stores the report in a real database, listed in the **Mission Control** view |
 | A human figure with clickable body parts | **3D holographic body map** that you can rotate. It has 10 regions (brain, eyes, lungs, heart, blood and immunity, digestion, kidneys, bones, muscles, skin and radiation), and each organ glows in the color of its health status. Choosing a region zooms the camera in on it and shows what it does, how space affects it, the current data and what to do |
-| Different environments (spacecraft, station, rover, base) | 5 environments with their own gravity, typical radiation, exercise goal and real **communication delay** (from real time on the ISS to ~12 min from Mars) |
+| Different environments (spacecraft, station, rover, base) | 5 environments with their own gravity, typical radiation, exercise goal and real **communication delay** (from real time on the ISS to up to ~20 min from Mars) |
 | Prompt measurements as part of the mission routine | **Daily routine** with scheduled times and **reminders** when a task is overdue |
 | Gamification | XP, levels and ranks, streaks, "perfect days" and 11 badges |
 | Dynamic charts | **Trends** over 7, 14 or 30 days with normal / watch / critical color bands, statistics and trend direction |
@@ -76,16 +76,38 @@ To use your own Supabase project: run `supabase/schema.sql` in its SQL editor, t
 
 ## Resources used
 
-**NASA (Human Research Program)**
-- [5 Hazards of Human Spaceflight](https://www.nasa.gov/hrp/hazards/): basis for the "5 hazards" section (radiation, isolation and confinement, distance from Earth, gravity fields, hostile and closed environments).
-- [Risks of Human Spaceflight](https://www.nasa.gov/hrp/risks/)
-- [Ongoing HRP Research in Space](https://www.nasa.gov/hrp/ongoing-hrp-research/)
+**Challenge resources**
+- NASA HRP, [5 Hazards of Human Spaceflight](https://www.nasa.gov/hrp/hazards/): structure of the Guide and the hazard tags on every indicator (radiation, isolation and confinement, distance from Earth, gravity fields, hostile and closed environments).
+- NASA HRP, [Risks of Human Spaceflight](https://www.nasa.gov/hrp/risks/): the health risks covered by the body map (immune system, cardiovascular, SANS, bone, nutrition, sleep, radiation).
+- NASA HRP, [Ongoing HRP Research in Space](https://www.nasa.gov/hrp/ongoing-hrp-research/): background.
+- Canadian Space Agency, [Monitoring Radiation for Astronaut Health](https://www.asc-csa.gc.ca/eng/news/articles/2026/2026-02-26-monitoring-radiation-astronaut-health.asp) and [Why Do We Conduct Science Experiments in Space?](https://www.asc-csa.gc.ca/eng/iss/science/why-do-we-conduct-science-experiments-in-space.asp): background.
 
-**Canadian Space Agency (CSA)**
-- [Monitoring Radiation for Astronaut Health](https://www.asc-csa.gc.ca/eng/news/articles/2026/2026-02-26-monitoring-radiation-astronaut-health.asp)
-- [Why Do We Conduct Science Experiments in Space?](https://www.asc-csa.gc.ca/eng/iss/science/why-do-we-conduct-science-experiments-in-space.asp)
+### Sources for the figures
 
-> ⚠️ Team note: before submitting, review the reference ranges and figures in `js/data.js` (dose per environment, limits for each indicator, bone loss rates) against these sources. They are educational approximations.
+Every number in `js/data.js` was checked against the source below. Where there is no measured data yet, the table says so.
+
+| Figure in AstroHealth | Source |
+|---|---|
+| Career radiation limit: 600 mSv | NASA, [NASA-STD-3001 technical brief: Radiation Protection](https://www.nasa.gov/wp-content/uploads/2023/12/ochmo-tb-020-radiation-protection.pdf) |
+| Mars transit: 1.8 mSv/day | NASA JPL, [Data From NASA Rover's Voyage to Mars Aids Planning](https://www.jpl.nasa.gov/news/data-from-nasa-rovers-voyage-to-mars-aids-planning/) (Curiosity RAD) |
+| Mars surface: 0.64 mSv/day | Hassler et al., [*Science* 343 (2014)](https://doi.org/10.1126/science.1244797) (Curiosity RAD). NASA, [Radiation Measurements on Mars](https://science.nasa.gov/resource/radiation-measurements-on-mars/) |
+| Lunar base and rover: 1.37 mSv/day | Zhang et al., [*Science Advances* 6 (2020)](https://doi.org/10.1126/sciadv.aaz1334) (Chang'E 4 lander, lunar surface). Both lunar environments use this surface value. |
+| Space station: 0.5 mSv/day | NASA, [Space Faring: The Radiation Challenge](https://www.nasa.gov/wp-content/uploads/2017/04/radiationchallenge.pdf) (about 80 mSv per 6-month stay, more at solar minimum) |
+| Bone loss: 1–1.5% per month; kidney stones; fluid shift and vision; immune changes | NASA, [The Human Body in Space](https://www.nasa.gov/humans-in-space/the-human-body-in-space/) |
+| Communication delay from Mars: up to ~20 min one way, average ~12.5 min | NASA HRP, [Hazard: Distance From Earth](https://www.nasa.gov/hrp/hazard-distance-from-earth/) (up to 20 min; Mars is 140 million miles away on average, which light covers in about 12.5 min) |
+| About 2 hours of exercise per day on the ISS | NASA, [Counteracting Bone and Muscle Loss in Microgravity](https://www.nasa.gov/missions/station/iss-research/counteracting-bone-and-muscle-loss-in-microgravity/) |
+| Height can increase up to 3% (back pain) | NASA, [Risk of Spaceflight-Induced Bone Changes](https://www.nasa.gov/reference/risk-of-spaceflight-induced-bone-changes/) |
+| SANS: optic nerve swelling and flattening of the eye | NASA, [Risk of Spaceflight Associated Neuro-ocular Syndrome](https://www.nasa.gov/reference/risk-of-spaceflight-associated-neuro-ocular-syndrome-sans/) |
+| The heart becomes rounder in microgravity | NASA, [Cardiovascular Health in Microgravity](https://www.nasa.gov/missions/station/cardiovascular-health-in-microgravity/) |
+| ISS crews sleep about 6 hours on average | NASA HRP, [Evidence Report: Risk of Performance Decrements and Adverse Health Outcomes from Sleep Loss](https://humanresearchroadmap.nasa.gov/evidence/reports/Sleep.pdf) |
+| 16 sunrises a day on the ISS | NASA, [Spot the Station FAQ](https://www.nasa.gov/missions/station/spot-the-station-frequently-asked-questions/) |
+| High cabin CO₂ causes headaches | NASA, [NASA-STD-3001 technical brief: Carbon Dioxide](https://www.nasa.gov/wp-content/uploads/2023/12/ochmo-tb-004-carbon-dioxide.pdf) |
+| "Space anemia": 54% more red blood cells destroyed | Canadian Space Agency, [MARROW: Keeping blood healthy in space](https://www.asc-csa.gc.ca/eng/sciences/marrow.asp) |
+| Core body temperature rises about 1 °C on long missions | Stahn et al., [*Scientific Reports* 7 (2017)](https://doi.org/10.1038/s41598-017-15560-w) |
+| Blood pressure: normal below 120/80 mmHg | American Heart Association, [Understanding Blood Pressure Readings](https://www.heart.org/en/health-topics/high-blood-pressure/understanding-blood-pressure-readings) |
+| Fasting glucose: normal 99 mg/dL or below | CDC, [Diabetes Testing](https://www.cdc.gov/diabetes/diabetes-testing/index.html) |
+
+**AstroHealth assumptions (no measured data yet):** bone loss and exercise goals for the Moon and Mars (scaled from the ISS values), the dose that triggers a radiation alert, the ±2% / ±5% body-mass thresholds, and the general clinical ranges for heart rate, temperature, oxygen saturation and sleep. They are educational choices, not medical criteria.
 
 ---
 
@@ -147,7 +169,7 @@ AstroHealth was built with one SI tool: **Claude (Anthropic)**, an AI assistant 
 |---|---|
 | Code | Wrote the HTML, CSS and JavaScript in this repository, including the canvas charts, the SVG icons, the logo, the 3D hologram body and its rendering engine, the Supabase connection and the database schema (`supabase/schema.sql`). |
 | Cloud setup | Created the Supabase project and the Render and GitHub Pages deployments at the team's request. |
-| Data | Wrote the reference ranges and recommendations in `js/data.js` as educational approximations, and the 30-day **simulated** demo mission. No real astronaut data is used. |
+| Data | Wrote the reference ranges and recommendations in `js/data.js` as educational approximations, checked each figure against the sources listed in "Sources for the figures", and generated the 30-day **simulated** demo mission. No real astronaut data is used. |
 | Text | Wrote the interface text, the health guidance, the Spanish translation and this README. |
 | Design | Proposed the feature set and the screen layout, following the requirements listed in the challenge description. |
 

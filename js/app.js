@@ -25,7 +25,7 @@
   const stressLabel = (v) => tx(['', 'Very low', 'Low', 'Moderate', 'High', 'Extreme'], ['', 'Muy bajo', 'Bajo', 'Moderado', 'Alto', 'Extremo'])[v];
   const bpName = () => tx('Blood pressure', 'Presión arterial');
   const VIEWS = ['dashboard', 'body', 'log', 'trends', 'routine', 'control', 'guide'];
-  const BP_RANGE = '90–129 / 60–84 mmHg';
+  const BP_RANGE = '90–119 / 60–79 mmHg';
 
   let state = V.loadState();
   let A = null;              // current assessment (cache)
@@ -197,7 +197,7 @@
     const value = isBP
       ? (it.value ? `${V.fmtVal('sys', it.value[0])}/${V.fmtVal('dia', it.value[1])}` : '—')
       : (it.value != null ? V.fmtVal(id, it.value) : '—');
-    const range = isBP ? '90–129 / 60–84' : V.rangeText(id, ctx);
+    const range = isBP ? '90–119 / 60–79' : V.rangeText(id, ctx);
     const sid = isBP ? 'sys' : id;
     const sv = V.lastNDays(7).map((k) => V.dayValue(A.days, k, sid));
     const sl = sv.map((v) => (v == null ? null : V.statusOf(sid, v, ctx).level));
@@ -1039,7 +1039,7 @@
       }).join('')}</div></div>
 
       <div class="grid two">
-        <div class="card"><h2 class="card-title">${ic('book')} ${tx('Challenge resources', 'Recursos del reto')}</h2>
+        <div class="card"><h2 class="card-title">${ic('book')} ${tx('Sources', 'Fuentes')}</h2>
           <ul class="resources">${V.RESOURCES.map((r) => `<li><a href="${r.url}" target="_blank" rel="noopener noreferrer">${esc(r.name)}</a><span class="muted small">${esc(r.org)}</span></li>`).join('')}</ul>
         </div>
         <div class="card"><h2 class="card-title">${ic('info')} ${tx('Important notice', 'Aviso importante')}</h2>
